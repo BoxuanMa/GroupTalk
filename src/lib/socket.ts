@@ -118,6 +118,27 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
           // ai-engine module not yet implemented — silently ignore
         }
       }, 2000 + Math.random() * 3000)
+
+      // Reset silence timer for AI auto-trigger on conversation lulls
+      try {
+        const { resetSilenceTimer } = await import('./ai-engine')
+        const groupData = await prisma.group.findUnique({
+          where: { id: groupId },
+          include: { activity: true },
+        })
+        if (groupData) {
+          const { mergeAiConfig } = await import('./ai-config')
+          const config = mergeAiConfig(
+            groupData.activity.aiConfig as Record<string, unknown>,
+            groupData.aiConfig as Record<string, unknown> | null
+          )
+          if (config.silenceThreshold > 0 && config.triggerMode !== 'mention_only') {
+            resetSilenceTimer(groupId, socket.data.activityId, config.silenceThreshold * 1000)
+          }
+        }
+      } catch {
+        // ai-engine not yet available
+      }
     })
 
     // Waiting room
