@@ -1,0 +1,133 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ActivityStatus {
+  draft
+  waiting
+  active
+  ended
+}
+
+enum AiRole {
+  system_helper
+  known_ai_peer
+  hidden_ai_peer
+}
+
+enum SenderType {
+  student
+  ai
+}
+
+enum UserType {
+  teacher
+  student
+  ai
+}
+
+model Teacher {
+  id         String     @id @default(uuid())
+  username   String     @unique
+  password   String
+  name       String
+  createdAt  DateTime   @default(now())
+  activities Activity[]
+}
+
+model Activity {
+  id          String         @id @default(uuid())
+  teacherId   String
+  teacher     Teacher        @relation(fields: [teacherId], references: [id])
+  title       String
+  joinCode    String         @unique
+  status      ActivityStatus @default(draft)
+  pdfUrl      String?
+  pdfFileName String?
+  aiConfig    Json           @default("{}")
+  groupSize   Json           @default("{\"min\": 2, \"max\": 4}")
+  createdAt   DateTime       @default(now())
+  groups      Group[]
+  students    Student[]
+  conceptMaps ConceptMap[]
+  logs        ActivityLog[]
+}
+
+model Group {
+  id          String        @id @default(uuid())
+  activityId  String
+  activity    Activity      @relation(fields: [activityId], references: [id])
+  groupNumber Int
+  aiRole      AiRole        @default(system_helper)
+  aiConfig    Json?
+  members     GroupMember[]
+  messages    Message[]
+  conceptMaps ConceptMap[]
+}
+
+model Student {
+  id            String        @id @default(uuid())
+  activityId    String
+  activity      Activity      @relation(fields: [activityId], references: [id])
+  studentNumber String
+  name          String
+  createdAt     DateTime      @default(now())
+  memberships   GroupMember[]
+
+  @@unique([studentNumber, activityId])
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id])
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id])
+  joinedAt  DateTime @default(now())
+
+  @@unique([studentId])
+}
+
+model Message {
+  id         String     @id @default(uuid())
+  groupId    String
+  group      Group      @relation(fields: [groupId], references: [id])
+  senderId   String?
+  senderType SenderType
+  senderName String
+  content    String
+  timestamp  DateTime   @default(now())
+  aiMetadata Json?
+}
+
+model ConceptMap {
+  id              String    @id @default(uuid())
+  activityId      String
+  activity        Activity  @relation(fields: [activityId], references: [id])
+  groupId         String
+  group           Group     @relation(fields: [groupId], references: [id])
+  type            String    // pdf_based or chat_based
+  nodes           Json      @default("[]")
+  edges           Json      @default("[]")
+  originalNodes   Json      @default("[]")
+  originalEdges   Json      @default("[]")
+  editedByTeacher Boolean   @default(false)
+  generatedAt     DateTime  @default(now())
+  editedAt        DateTime?
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  activityId String
+  activity   Activity @relation(fields: [activityId], references: [id])
+  userId     String
+  userType   UserType
+  action     String
+  metadata   Json     @default("{}")
+  timestamp  DateTime @default(now())
+}
