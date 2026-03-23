@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
-import pdfParse from 'pdf-parse'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require('pdf-parse')
 import { readFile } from 'fs/promises'
 import path from 'path'
 

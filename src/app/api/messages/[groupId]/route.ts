@@ -1,24 +1,9 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthPayload, unauthorized, forbidden } from '@/lib/middleware'
-
-// Exported for testing
-export function maskMessagesForStudent(
-  messages: Array<Record<string, unknown>>,
-  aiRole: string,
-  groupId: string
-): Array<Record<string, unknown>> {
-  return messages.map((msg) => {
-    if (msg.senderType === 'ai' && aiRole === 'hidden_ai_peer') {
-      const { aiMetadata, ...rest } = msg
-      void aiMetadata
-      return { ...rest, senderType: 'student', senderId: `virtual-${groupId}` }
-    }
-    const { aiMetadata, ...rest } = msg
-    void aiMetadata
-    return rest
-  })
-}
+import { maskMessagesForStudent } from '@/lib/message-utils'
 
 export async function GET(request: NextRequest, { params }: { params: { groupId: string } }) {
   const payload = getAuthPayload(request)

@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 
 export async function logActivity(params: {
@@ -13,7 +14,7 @@ export async function logActivity(params: {
       userId: params.userId,
       userType: params.userType,
       action: params.action,
-      metadata: params.metadata || {},
+      metadata: (params.metadata || {}) as Prisma.InputJsonValue,
     },
   })
 }

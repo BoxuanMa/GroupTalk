@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { mergeAiConfig, AiConfig } from './ai-config'
 import { logActivity } from './activity-log'
@@ -174,7 +175,7 @@ export async function handleAiTrigger(groupId: string, activityId: string) {
       senderType: 'ai',
       senderName: config.displayName,
       content: result.content,
-      aiMetadata: result.metadata,
+      aiMetadata: result.metadata as unknown as Prisma.InputJsonValue,
     },
   })
 

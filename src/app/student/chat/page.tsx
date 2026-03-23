@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { io, Socket } from 'socket.io-client'
-import { PdfViewer } from '@/components/pdf-viewer'
+import dynamic from 'next/dynamic'
+const PdfViewer = dynamic(() => import('@/components/pdf-viewer').then((m) => m.PdfViewer), { ssr: false })
 import { ChatPanel } from '@/components/chat-panel'
 
 export default function StudentChatPage() {

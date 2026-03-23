@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card'
 
 export default function StudentWaitingPage() {
   const router = useRouter()
-  const [status, setStatus] = useState('等待老师开始活动...')
+  const [status] = useState('等待老师开始活动...')
 
   useEffect(() => {
     const token = localStorage.getItem('token')

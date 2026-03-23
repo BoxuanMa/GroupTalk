@@ -51,7 +51,7 @@ export default function ConceptMapsPage() {
     alert('保存成功')
   }
 
-  const groupNumbers = [...new Set(maps.map((m) => m.group.groupNumber))].sort()
+  const groupNumbers = Array.from(new Set(maps.map((m) => m.group.groupNumber))).sort()
   const currentGroupNum = groupNumbers[currentGroupIndex]
   const pdfMap = maps.find((m) => m.group.groupNumber === currentGroupNum && m.type === 'pdf_based')
   const chatMap = maps.find((m) => m.group.groupNumber === currentGroupNum && m.type === 'chat_based')

@@ -1,9 +1,4 @@
-// Mock prisma before importing the route
-jest.mock('@/lib/prisma', () => ({
-  prisma: {},
-}))
-
-import { maskMessagesForStudent } from '@/app/api/messages/[groupId]/route'
+import { maskMessagesForStudent } from '@/lib/message-utils'
 
 describe('Message API', () => {
   test('student API masks hidden AI peer messages', () => {

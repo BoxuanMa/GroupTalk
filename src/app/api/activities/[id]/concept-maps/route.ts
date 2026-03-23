@@ -1,4 +1,7 @@
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireTeacher, unauthorized } from '@/lib/middleware'
 import { extractPdfText, generateConceptMap } from '@/lib/concept-map-generator'
@@ -41,16 +44,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           const pdfMap = await generateConceptMap(pdfText, 'pdf')
           await prisma.conceptMap.upsert({
             where: { id: `${group.id}-pdf` },
-            update: { nodes: pdfMap.nodes, edges: pdfMap.edges, originalNodes: pdfMap.nodes, originalEdges: pdfMap.edges },
+            update: { nodes: pdfMap.nodes as unknown as Prisma.InputJsonValue, edges: pdfMap.edges as unknown as Prisma.InputJsonValue, originalNodes: pdfMap.nodes as unknown as Prisma.InputJsonValue, originalEdges: pdfMap.edges as unknown as Prisma.InputJsonValue },
             create: {
               id: `${group.id}-pdf`,
               activityId: params.id,
               groupId: group.id,
               type: 'pdf_based',
-              nodes: pdfMap.nodes,
-              edges: pdfMap.edges,
-              originalNodes: pdfMap.nodes,
-              originalEdges: pdfMap.edges,
+              nodes: pdfMap.nodes as unknown as Prisma.InputJsonValue,
+              edges: pdfMap.edges as unknown as Prisma.InputJsonValue,
+              originalNodes: pdfMap.nodes as unknown as Prisma.InputJsonValue,
+              originalEdges: pdfMap.edges as unknown as Prisma.InputJsonValue,
             },
           })
         }
@@ -66,16 +69,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           const chatMap = await generateConceptMap(chatText, 'chat')
           await prisma.conceptMap.upsert({
             where: { id: `${group.id}-chat` },
-            update: { nodes: chatMap.nodes, edges: chatMap.edges, originalNodes: chatMap.nodes, originalEdges: chatMap.edges },
+            update: { nodes: chatMap.nodes as unknown as Prisma.InputJsonValue, edges: chatMap.edges as unknown as Prisma.InputJsonValue, originalNodes: chatMap.nodes as unknown as Prisma.InputJsonValue, originalEdges: chatMap.edges as unknown as Prisma.InputJsonValue },
             create: {
               id: `${group.id}-chat`,
               activityId: params.id,
               groupId: group.id,
               type: 'chat_based',
-              nodes: chatMap.nodes,
-              edges: chatMap.edges,
-              originalNodes: chatMap.nodes,
-              originalEdges: chatMap.edges,
+              nodes: chatMap.nodes as unknown as Prisma.InputJsonValue,
+              edges: chatMap.edges as unknown as Prisma.InputJsonValue,
+              originalNodes: chatMap.nodes as unknown as Prisma.InputJsonValue,
+              originalEdges: chatMap.edges as unknown as Prisma.InputJsonValue,
             },
           })
         }

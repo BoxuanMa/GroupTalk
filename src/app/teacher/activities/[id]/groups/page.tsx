@@ -60,12 +60,6 @@ export default function GroupManagementPage() {
     loadGroups()
   }
 
-  const roleLabels: Record<string, string> = {
-    system_helper: '系统助手',
-    known_ai_peer: '已知AI同伴',
-    hidden_ai_peer: '隐藏AI同伴',
-  }
-
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">分组管理</h1>
