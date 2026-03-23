@@ -11,5 +11,20 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/grouptalk
+      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      NEXT_PUBLIC_SOCKET_URL: http://localhost:3000
+    depends_on:
+      - db
+    volumes:
+      - uploads:/app/uploads
+
 volumes:
   pgdata:
+  uploads:
