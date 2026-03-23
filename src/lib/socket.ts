@@ -103,7 +103,7 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
       await logActivity({
         activityId: socket.data.activityId,
         userId: user.userId,
-        userType: 'student',
+        userType: user.role,
         action: 'send_message',
         metadata: { groupId, messageId: message.id },
       })
