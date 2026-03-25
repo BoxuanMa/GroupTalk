@@ -9,25 +9,57 @@ export default function StudentWaitingPage() {
   const [status] = useState('等待老师开始活动...')
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    const activityId = localStorage.getItem('activityId')
+    const token = sessionStorage.getItem('student_token')
+    const activityId = sessionStorage.getItem('activityId')
     if (!token || !activityId) { router.push('/student/join'); return }
+
+    console.log('[waiting] token:', token?.substring(0, 20) + '...', 'activityId:', activityId)
 
     const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000', {
       auth: { token },
     })
 
-    socket.emit('join-waiting', activityId)
+    socket.on('connect', () => {
+      console.log('[waiting] socket connected, joining waiting room:', activityId)
+      socket.emit('join-waiting', activityId)
+    })
 
-    const student = JSON.parse(localStorage.getItem('student') || '{}')
+    socket.on('connect_error', (err) => {
+      console.error('[waiting] socket connect error:', err.message)
+    })
+
+    const student = JSON.parse(sessionStorage.getItem('student') || '{}')
+    console.log('[waiting] student:', student)
+
     socket.on('activity-started', (data: { studentId: string; groupId: string }) => {
+      console.log('[waiting] activity-started received:', data, 'my id:', student.id)
       if (data.studentId === student.id) {
-        localStorage.setItem('groupId', data.groupId)
+        sessionStorage.setItem('groupId', data.groupId)
         router.push('/student/chat')
       }
     })
 
-    return () => { socket.disconnect() }
+    // Fallback: poll API every 5s to check if assigned to a group
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/student/my-group', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.groupId) {
+            console.log('[waiting] poll found group:', data.groupId)
+            sessionStorage.setItem('groupId', data.groupId)
+            router.push('/student/chat')
+          }
+        }
+      } catch { /* ignore */ }
+    }, 5000)
+
+    return () => {
+      socket.disconnect()
+      clearInterval(pollInterval)
+    }
   }, [router])
 
   return (

@@ -16,13 +16,15 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
       const payload = verifyToken(token)
       socket.data.user = payload
       next()
-    } catch {
+    } catch (err) {
+      console.log('[Socket.IO] auth failed:', err)
       next(new Error('Authentication failed'))
     }
   })
 
   io.on('connection', (socket) => {
     const user = socket.data.user
+    console.log('[Socket.IO] client connected:', user.userId, user.role)
 
     // Join group room
     socket.on('join-group', async (groupId: string) => {
@@ -30,11 +32,12 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
       if (user.role === 'student') {
         const member = await prisma.groupMember.findFirst({
           where: { studentId: user.userId, groupId },
-          include: { group: true },
+          include: { group: true, student: true },
         })
         if (!member) return socket.emit('error', 'Not a member of this group')
         socket.data.groupId = groupId
         socket.data.activityId = member.group.activityId
+        socket.data.userName = member.student.name
       } else {
         // Teacher can join any group
         const group = await prisma.group.findUnique({ where: { id: groupId } })
@@ -108,14 +111,14 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
         metadata: { groupId, messageId: message.id },
       })
 
-      // Trigger AI response check — direct function call (not Socket.IO event)
-      // ai-engine.ts does not exist yet (Task 6), so wrap in try-catch
+      // Trigger AI response check
       setTimeout(async () => {
         try {
           const { handleAiTrigger } = await import('./ai-engine')
-          handleAiTrigger(groupId, socket.data.activityId)
-        } catch {
-          // ai-engine module not yet implemented — silently ignore
+          console.log('[AI] triggering for group:', groupId)
+          await handleAiTrigger(groupId, socket.data.activityId)
+        } catch (err) {
+          console.error('[AI] trigger error:', err)
         }
       }, 2000 + Math.random() * 3000)
 
@@ -141,8 +144,20 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
       }
     })
 
+    // Typing indicator
+    socket.on('typing', (isTyping: boolean) => {
+      const groupId = socket.data.groupId
+      if (!groupId) return
+      socket.to(`group:${groupId}`).emit('user-typing', {
+        userId: user.userId,
+        name: socket.data.userName || 'Unknown',
+        isTyping,
+      })
+    })
+
     // Waiting room
     socket.on('join-waiting', (activityId: string) => {
+      console.log('[Socket.IO] join-waiting:', activityId, 'user:', user.userId)
       socket.join(`waiting:${activityId}`)
     })
 

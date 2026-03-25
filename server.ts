@@ -1,6 +1,9 @@
+import dotenv from 'dotenv'
+dotenv.config()
 import { createServer } from 'http'
 import next from 'next'
 import { setupSocketIO } from './src/lib/socket'
+import { setIO } from './src/lib/io-store'
 
 const dev = process.env.NODE_ENV !== 'production'
 const app = next({ dev })
@@ -14,8 +17,9 @@ app.prepare().then(() => {
 
   const io = setupSocketIO(httpServer)
 
-  // Make io accessible for AI engine
-  ;(global as Record<string, unknown>).__io = io
+  // Make io accessible for API routes
+  setIO(io)
+  ;(globalThis as Record<string, unknown>).__io = io
 
   httpServer.listen(port, () => {
     console.log(`> Ready on http://localhost:${port}`)

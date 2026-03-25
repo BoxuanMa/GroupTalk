@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireTeacher, unauthorized } from '@/lib/middleware'
-import { extractPdfText, generateConceptMap } from '@/lib/concept-map-generator'
+import { generateConceptMap, generatePdfConceptMap } from '@/lib/concept-map-generator'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -21,8 +21,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+  let payload
   try {
-    const payload = requireTeacher(request)
+    payload = requireTeacher(request)
+  } catch {
+    return unauthorized()
+  }
+
+  try {
     const activity = await prisma.activity.findFirst({
       where: { id: params.id, teacherId: payload.userId, status: 'ended' },
       include: { groups: true },
@@ -31,17 +37,23 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'Activity not found or not ended' }, { status: 400 })
     }
 
-    let pdfText = ''
+    // Generate PDF concept map once (same for all groups)
+    let pdfMap: { nodes: unknown[]; edges: unknown[] } | null = null
     if (activity.pdfUrl) {
-      pdfText = await extractPdfText(activity.pdfUrl)
+      try {
+        pdfMap = await generatePdfConceptMap(activity.pdfUrl)
+        console.log('[ConceptMap] PDF map generated:', pdfMap.nodes.length, 'nodes,', pdfMap.edges.length, 'edges')
+      } catch (pdfErr) {
+        console.error('PDF concept map generation failed:', pdfErr)
+      }
     }
 
     const results: Array<{ groupId: string; groupNumber: number; status: string }> = []
 
     for (const group of activity.groups) {
       try {
-        if (pdfText) {
-          const pdfMap = await generateConceptMap(pdfText, 'pdf')
+        if (pdfMap && pdfMap.nodes.length > 0) {
+          console.log(`[Route] Saving PDF map for group ${group.groupNumber}: ${pdfMap.nodes.length} nodes, ${pdfMap.edges.length} edges`)
           await prisma.conceptMap.upsert({
             where: { id: `${group.id}-pdf` },
             update: { nodes: pdfMap.nodes as unknown as Prisma.InputJsonValue, edges: pdfMap.edges as unknown as Prisma.InputJsonValue, originalNodes: pdfMap.nodes as unknown as Prisma.InputJsonValue, originalEdges: pdfMap.edges as unknown as Prisma.InputJsonValue },
@@ -84,13 +96,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         }
 
         results.push({ groupId: group.id, groupNumber: group.groupNumber, status: 'success' })
-      } catch {
+      } catch (groupErr) {
+        console.error(`Group ${group.groupNumber} concept map failed:`, groupErr)
         results.push({ groupId: group.id, groupNumber: group.groupNumber, status: 'failed' })
       }
     }
 
     return NextResponse.json({ results })
-  } catch {
-    return unauthorized()
+  } catch (error: unknown) {
+    console.error('Concept map generation error:', error)
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

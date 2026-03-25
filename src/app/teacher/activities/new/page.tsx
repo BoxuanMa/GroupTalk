@@ -18,7 +18,7 @@ export default function NewActivityPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('teacher_token')
 
     // 1. Create activity
     const res = await fetch('/api/activities', {

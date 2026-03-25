@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { io, Socket } from 'socket.io-client'
 import dynamic from 'next/dynamic'
@@ -10,19 +10,26 @@ export default function StudentChatPage() {
   const router = useRouter()
   const [socket, setSocket] = useState<Socket | null>(null)
   const [activity, setActivity] = useState<{ pdfUrl: string } | null>(null)
-  const [members, setMembers] = useState<Array<{ name: string }>>([])
+  const [members, setMembers] = useState<Array<{ name: string; type?: 'student' | 'ai' }>>([])
   const [groupId, setGroupId] = useState('')
   const [currentUserId, setCurrentUserId] = useState('')
+  const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    const storedGroupId = localStorage.getItem('groupId')
-    const student = JSON.parse(localStorage.getItem('student') || '{}')
+    const token = sessionStorage.getItem('student_token')
+    const storedGroupId = sessionStorage.getItem('groupId')
+    const student = JSON.parse(sessionStorage.getItem('student') || '{}')
 
     if (!token || !storedGroupId) { router.push('/student/join'); return }
 
     setGroupId(storedGroupId)
     setCurrentUserId(student.id)
+
+    // Avoid creating duplicate sockets on React StrictMode double-mount
+    if (socketRef.current) {
+      setSocket(socketRef.current)
+      return
+    }
 
     const s = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000', {
       auth: { token },
@@ -38,6 +45,7 @@ export default function StudentChatPage() {
       }
     })
 
+    socketRef.current = s
     setSocket(s)
 
     // Fetch activity info and group members via student API
@@ -52,7 +60,10 @@ export default function StudentChatPage() {
         }
       })
 
-    return () => { s.disconnect() }
+    return () => {
+      s.disconnect()
+      socketRef.current = null
+    }
   }, [router])
 
   return (
@@ -60,8 +71,10 @@ export default function StudentChatPage() {
       <div className="w-1/2 border-r">
         {activity?.pdfUrl ? (
           <PdfViewer url={activity.pdfUrl} />
+        ) : activity === null ? (
+          <div className="flex items-center justify-center h-full text-gray-400">加载中...</div>
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-400">加载 PDF 中...</div>
+          <div className="flex items-center justify-center h-full text-gray-400">未上传 PDF 课件</div>
         )}
       </div>
       <div className="w-1/2">

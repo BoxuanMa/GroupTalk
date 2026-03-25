@@ -3,8 +3,11 @@ import { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 import { mergeAiConfig, AiConfig } from './ai-config'
 import { logActivity } from './activity-log'
+import { getIO } from './io-store'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+}
 
 interface ChatMessage {
   senderName: string
@@ -105,7 +108,7 @@ export async function generateAiResponse(params: {
   const startTime = Date.now()
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: config.model,
       messages: prompt,
       temperature: config.temperature,
@@ -160,12 +163,32 @@ export async function handleAiTrigger(groupId: string, activityId: string) {
 
   if (!(await shouldTriggerAi(groupId, config, mentionedAi))) return
 
+  // Show typing indicator
+  const io = getIO()
+  if (io) {
+    io.to(`group:${groupId}`).emit('user-typing', {
+      userId: 'ai',
+      name: config.displayName,
+      isTyping: true,
+    })
+  }
+
   let pdfSummary = ''
   if (group.activity.pdfUrl) {
     pdfSummary = '(PDF content available)'
   }
 
   const result = await generateAiResponse({ groupId, activityId, config, pdfSummary })
+
+  // Stop typing indicator
+  if (io) {
+    io.to(`group:${groupId}`).emit('user-typing', {
+      userId: 'ai',
+      name: config.displayName,
+      isTyping: false,
+    })
+  }
+
   if (!result) return
 
   const message = await prisma.message.create({
@@ -187,7 +210,6 @@ export async function handleAiTrigger(groupId: string, activityId: string) {
     metadata: { groupId, messageId: message.id },
   })
 
-  const io = (global as Record<string, unknown>).__io as import('socket.io').Server | undefined
   if (io) {
     const emitData: Record<string, unknown> = {
       id: message.id,

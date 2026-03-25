@@ -29,9 +29,9 @@ export default function StudentJoinPage() {
     }
 
     const data = await res.json()
-    localStorage.setItem('token', data.token)
-    localStorage.setItem('student', JSON.stringify(data.student))
-    localStorage.setItem('activityId', data.activityId)
+    sessionStorage.setItem('student_token', data.token)
+    sessionStorage.setItem('student', JSON.stringify(data.student))
+    sessionStorage.setItem('activityId', data.activityId)
     router.push('/student/waiting')
   }
 

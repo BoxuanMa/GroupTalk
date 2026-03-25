@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -13,7 +14,7 @@ export default function GroupManagementPage() {
   const params = useParams()
   const [groups, setGroups] = useState<Group[]>([])
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  const token = typeof window !== 'undefined' ? localStorage.getItem('teacher_token') : null
 
   async function loadGroups() {
     const res = await fetch(`/api/activities/${params.id}/groups`, {
@@ -62,7 +63,12 @@ export default function GroupManagementPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">分组管理</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <Link href={`/teacher/activities/${params.id}`} className="text-gray-400 hover:text-gray-600 transition">
+          ← 返回
+        </Link>
+        <h1 className="text-2xl font-bold">分组管理</h1>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 mb-6">
         {groups.map((group) => (

@@ -29,7 +29,7 @@ export default function TeacherRegisterPage() {
     }
 
     const data = await res.json()
-    localStorage.setItem('token', data.token)
+    localStorage.setItem('teacher_token', data.token)
     localStorage.setItem('user', JSON.stringify(data.teacher))
     router.push('/teacher/dashboard')
   }

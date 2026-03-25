@@ -6,17 +6,34 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
 interface Student { id: string; studentNumber: string; name: string }
+interface GroupMember { student: Student }
+interface Group { id: string; groupNumber: number; aiRole: string; members: GroupMember[]; _count?: { messages: number } }
 interface Activity {
-  id: string; title: string; joinCode: string; status: string
+  id: string; title: string; joinCode: string; status: string; pdfFileName: string | null
   students: Student[]
+  groups: Group[]
+}
+
+const statusLabels: Record<string, string> = {
+  draft: '草稿', waiting: '等待中', active: '进行中', ended: '已结束',
+}
+const statusColors: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-600',
+  waiting: 'bg-yellow-100 text-yellow-700',
+  active: 'bg-green-100 text-green-700',
+  ended: 'bg-blue-100 text-blue-700',
+}
+const aiRoleLabels: Record<string, string> = {
+  system_helper: '系统助手', known_ai_peer: '已知AI同伴', hidden_ai_peer: '隐藏AI同伴',
 }
 
 export default function ActivityDetailPage() {
   const router = useRouter()
   const params = useParams()
   const [activity, setActivity] = useState<Activity | null>(null)
+  const [uploading, setUploading] = useState(false)
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  const token = typeof window !== 'undefined' ? localStorage.getItem('teacher_token') : null
 
   async function loadActivity() {
     const res = await fetch(`/api/activities/${params.id}`, {
@@ -37,6 +54,7 @@ export default function ActivityDetailPage() {
   }
 
   async function handleEndDiscussion() {
+    if (!confirm('确定要结束讨论吗？结束后学生将无法继续发送消息。')) return
     await fetch(`/api/activities/${params.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -45,25 +63,67 @@ export default function ActivityDetailPage() {
     loadActivity()
   }
 
+  async function handleUploadPdf(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const formData = new FormData()
+    formData.append('pdf', file)
+    await fetch(`/api/activities/${params.id}/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    })
+    setUploading(false)
+    loadActivity()
+  }
+
   if (!activity) return <div className="p-6">加载中...</div>
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{activity.title}</h1>
-        <span className="px-3 py-1 rounded-full bg-gray-100">{activity.status}</span>
+      <div className="flex items-center gap-3">
+        <Link href="/teacher/dashboard" className="text-gray-400 hover:text-gray-600 transition">
+          ← 返回
+        </Link>
+        <div className="flex-1" />
+        <span className={`px-3 py-1 rounded-full text-sm ${statusColors[activity.status] || 'bg-gray-100'}`}>
+          {statusLabels[activity.status] || activity.status}
+        </span>
       </div>
 
+      <h1 className="text-2xl font-bold">{activity.title}</h1>
+
+      {/* Activity Code */}
       <Card>
         <h3 className="font-semibold mb-2">活动码</h3>
         <p className="text-3xl font-mono tracking-wider">{activity.joinCode}</p>
         <p className="text-sm text-gray-500 mt-1">将此活动码分享给学生</p>
       </Card>
 
+      {/* PDF */}
+      <Card>
+        <h3 className="font-semibold mb-2">课件 PDF</h3>
+        {activity.pdfFileName ? (
+          <p className="text-sm text-gray-600">已上传: {activity.pdfFileName}</p>
+        ) : (
+          <div>
+            <p className="text-sm text-gray-400 mb-2">未上传课件</p>
+            <label className="cursor-pointer inline-block px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+              {uploading ? '上传中...' : '上传 PDF'}
+              <input type="file" accept=".pdf" className="hidden" onChange={handleUploadPdf} disabled={uploading} />
+            </label>
+          </div>
+        )}
+      </Card>
+
+      {/* Students */}
       <Card>
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-semibold">已加入的学生 ({activity.students.length})</h3>
-          <Button onClick={loadActivity} className="bg-gray-200 text-gray-700 hover:bg-gray-300">刷新</Button>
+          {activity.status === 'waiting' && (
+            <Button onClick={loadActivity} className="bg-gray-200 text-gray-700 hover:bg-gray-300">刷新</Button>
+          )}
         </div>
         <div className="grid grid-cols-3 gap-2">
           {activity.students.map((s) => (
@@ -72,9 +132,42 @@ export default function ActivityDetailPage() {
             </div>
           ))}
         </div>
+        {activity.students.length === 0 && (
+          <p className="text-sm text-gray-400">暂无学生加入</p>
+        )}
       </Card>
 
-      <div className="flex gap-4">
+      {/* Groups (visible for active and ended) */}
+      {activity.groups.length > 0 && (
+        <Card>
+          <h3 className="font-semibold mb-3">小组 ({activity.groups.length})</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {activity.groups.map((g) => (
+              <Link
+                key={g.id}
+                href={`/teacher/activities/${params.id}/groups/${g.id}/chat`}
+                className="block p-3 border rounded-lg hover:bg-gray-50 transition"
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-medium">第 {g.groupNumber} 组</span>
+                  <span className="text-xs px-2 py-0.5 bg-purple-50 text-purple-600 rounded">
+                    {aiRoleLabels[g.aiRole] || g.aiRole}
+                  </span>
+                </div>
+                <div className="text-sm text-gray-500">
+                  {g.members.map((m) => m.student.name).join('、')}
+                </div>
+                {g._count?.messages !== undefined && (
+                  <div className="text-xs text-gray-400 mt-1">{g._count.messages} 条消息</div>
+                )}
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-3">
         {activity.status === 'waiting' && (
           <Button onClick={handleStartGrouping} disabled={activity.students.length < 2}>
             开始分组 ({activity.students.length} 人)
@@ -83,12 +176,12 @@ export default function ActivityDetailPage() {
 
         {activity.status === 'active' && (
           <>
+            <Link href={`/teacher/activities/${params.id}/groups`}>
+              <Button>管理分组</Button>
+            </Link>
             <Button onClick={handleEndDiscussion} className="bg-red-600 hover:bg-red-700">
               结束讨论
             </Button>
-            <Link href={`/teacher/activities/${params.id}/groups`}>
-              <Button className="bg-gray-600 hover:bg-gray-700">查看分组</Button>
-            </Link>
           </>
         )}
 

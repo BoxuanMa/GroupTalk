@@ -13,7 +13,7 @@ const EXPORT_TYPES = [
 
 export default function ExportPage() {
   const params = useParams()
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  const token = typeof window !== 'undefined' ? localStorage.getItem('teacher_token') : null
 
   function handleDownload(type: string, format: string) {
     const url = `/api/activities/${params.id}/export?type=${type}`
