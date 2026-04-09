@@ -6,12 +6,25 @@ import { ConceptMapEditor } from '@/components/concept-map-editor'
 import { Button } from '@/components/ui/button'
 import { Node, Edge } from 'reactflow'
 
+interface StoredNode {
+  id: string
+  label: string
+  category: string
+  color: string
+  position: { x: number; y: number }
+}
+interface StoredEdge {
+  id: string
+  source: string
+  target: string
+  relation: string
+}
 interface ConceptMap {
   id: string
   groupId: string
   type: string
-  nodes: Array<{ id: string; label: string; category: string; color: string; position: { x: number; y: number } }>
-  edges: Array<{ id: string; source: string; target: string; relation: string }>
+  nodes: StoredNode[]
+  edges: StoredEdge[]
   group: { groupNumber: number }
 }
 
@@ -51,22 +64,42 @@ export default function ConceptMapsPage() {
     if (isRegenerate && !confirm('重新生成会覆盖现有概念图（已编辑的修改将丢失），并消耗 API token。确定要重新生成吗？')) return
     const token = localStorage.getItem('teacher_token')
     setGenerating(true)
-    await fetch(`/api/activities/${params.id}/concept-maps`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    await loadMaps()
-    setGenerating(false)
+    try {
+      const res = await fetch(`/api/activities/${params.id}/concept-maps`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '')
+        alert(`生成失败 (${res.status}) ${msg}`)
+        return
+      }
+      await loadMaps()
+    } catch (e) {
+      console.error('handleGenerate error:', e)
+      alert('生成失败：网络错误')
+    } finally {
+      setGenerating(false)
+    }
   }
 
   async function handleSave(mapId: string, nodes: Node[], edges: Edge[]) {
     const token = localStorage.getItem('teacher_token')
-    await fetch(`/api/activities/${params.id}/concept-maps/${mapId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ nodes, edges }),
-    })
-    alert('保存成功')
+    try {
+      const res = await fetch(`/api/activities/${params.id}/concept-maps/${mapId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ nodes, edges }),
+      })
+      if (!res.ok) {
+        alert(`保存失败 (${res.status})`)
+        return
+      }
+      alert('保存成功')
+    } catch (e) {
+      console.error('handleSave error:', e)
+      alert('保存失败：网络错误')
+    }
   }
 
   const groupNumbers = Array.from(new Set(maps.map((m) => m.group.groupNumber))).sort()
