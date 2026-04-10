@@ -4,39 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getAuthPayload, unauthorized } from '@/lib/middleware'
-
-// Normalize ReactFlow node/edge shape back to the flat storage schema
-// so the DB always holds a single canonical form.
-type AnyRecord = Record<string, unknown>
-function normalizeNodes(input: unknown): AnyRecord[] {
-  if (!Array.isArray(input)) return []
-  return input.map((n: AnyRecord, i) => {
-    const data = (n.data as AnyRecord | undefined) || {}
-    return {
-      id: String(n.id ?? `n${i}`),
-      label: (n.label as string) ?? (data.label as string) ?? '',
-      category: (n.category as string) ?? (data.category as string) ?? '概念',
-      color: (n.color as string) ?? (data.color as string) ?? '#6B7280',
-      position: (n.position as AnyRecord) ?? { x: 0, y: 0 },
-    }
-  })
-}
-function normalizeEdges(input: unknown): AnyRecord[] {
-  if (!Array.isArray(input)) return []
-  return input.map((e: AnyRecord, i) => {
-    const data = (e.data as AnyRecord | undefined) || {}
-    return {
-      id: String(e.id ?? `e${i}`),
-      source: String(e.source ?? ''),
-      target: String(e.target ?? ''),
-      relation:
-        (e.relation as string) ??
-        (data.relation as string) ??
-        (e.label as string) ??
-        '',
-    }
-  })
-}
+import { normalizeNodes, normalizeEdges } from '@/lib/concept-map-normalize'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string; mapId: string } }) {
   const payload = getAuthPayload(request)

@@ -5,9 +5,11 @@ import { io, Socket } from 'socket.io-client'
 import dynamic from 'next/dynamic'
 const PdfViewer = dynamic(() => import('@/components/pdf-viewer').then((m) => m.PdfViewer), { ssr: false })
 import { ChatPanel } from '@/components/chat-panel'
+import { useI18n } from '@/lib/i18n/I18nProvider'
 
 export default function StudentChatPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [socket, setSocket] = useState<Socket | null>(null)
   const [activity, setActivity] = useState<{ pdfUrl: string } | null>(null)
   const [members, setMembers] = useState<Array<{ name: string; type?: 'student' | 'ai' }>>([])
@@ -16,13 +18,11 @@ export default function StudentChatPage() {
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
-    const token = sessionStorage.getItem('student_token')
-    const storedGroupId = sessionStorage.getItem('groupId')
-    const student = JSON.parse(sessionStorage.getItem('student') || '{}')
+    const token = localStorage.getItem("student_token")
+    const student = JSON.parse(localStorage.getItem("student") || '{}')
 
-    if (!token || !storedGroupId) { router.push('/student/join'); return }
+    if (!token) { router.push('/student/join'); return }
 
-    setGroupId(storedGroupId)
     setCurrentUserId(student.id)
 
     // Avoid creating duplicate sockets on React StrictMode double-mount
@@ -35,13 +35,16 @@ export default function StudentChatPage() {
       auth: { token },
     })
 
+    let resolvedGroupId = localStorage.getItem("groupId") || ''
+    if (resolvedGroupId) setGroupId(resolvedGroupId)
+
     s.on('connect', () => {
-      s.emit('join-group', storedGroupId)
+      if (resolvedGroupId) s.emit('join-group', resolvedGroupId)
     })
 
     s.on('error', (msg: string) => {
       if (msg === 'Discussion has ended') {
-        alert('讨论已结束')
+        alert(t('student.chat.ended_alert'))
       }
     })
 
@@ -58,6 +61,13 @@ export default function StudentChatPage() {
           setActivity({ pdfUrl: data.activity.pdfUrl })
           setMembers(data.members || [])
         }
+        // Recover groupId if missing (e.g., reopened tab)
+        if (data.groupId && !resolvedGroupId) {
+          resolvedGroupId = data.groupId
+          localStorage.setItem('groupId', data.groupId)
+          setGroupId(data.groupId)
+          if (s.connected) s.emit('join-group', data.groupId)
+        }
       })
 
     return () => {
@@ -72,9 +82,9 @@ export default function StudentChatPage() {
         {activity?.pdfUrl ? (
           <PdfViewer url={activity.pdfUrl} />
         ) : activity === null ? (
-          <div className="flex items-center justify-center h-full text-gray-400">加载中...</div>
+          <div className="flex items-center justify-center h-full text-gray-400">{t('common.loading')}</div>
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-400">未上传 PDF 课件</div>
+          <div className="flex items-center justify-center h-full text-gray-400">{t('student.chat.no_pdf')}</div>
         )}
       </div>
       <div className="w-1/2">

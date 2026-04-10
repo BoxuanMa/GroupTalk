@@ -1,5 +1,7 @@
 'use client'
+import { useEffect } from 'react'
 import { Input } from '@/components/ui/input'
+import { DEFAULT_SYSTEM_PROMPT } from '@/lib/ai-config'
 
 interface AiConfigFormProps {
   value: Record<string, unknown>
@@ -8,6 +10,14 @@ interface AiConfigFormProps {
 
 export function AiConfigForm({ value, onChange }: AiConfigFormProps) {
   const role = (value.role as string) || 'system_helper'
+
+  // Pre-fill the default system prompt so teachers can see and edit it
+  useEffect(() => {
+    if (value.systemPrompt === undefined || value.systemPrompt === null) {
+      onChange({ ...value, systemPrompt: DEFAULT_SYSTEM_PROMPT })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function update(key: string, val: unknown) {
     onChange({ ...value, [key]: val })
@@ -42,8 +52,8 @@ export function AiConfigForm({ value, onChange }: AiConfigFormProps) {
       <div>
         <label className="block text-sm font-medium mb-1">角色人设 Prompt</label>
         <textarea
-          className="w-full border rounded-lg px-3 py-2 h-24"
-          value={(value.systemPrompt as string) || ''}
+          className="w-full border rounded-lg px-3 py-2 h-48 font-mono text-sm"
+          value={(value.systemPrompt as string) ?? DEFAULT_SYSTEM_PROMPT}
           onChange={(e) => update('systemPrompt', e.target.value)}
           placeholder="设定 AI 的角色和行为..."
         />

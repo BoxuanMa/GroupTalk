@@ -4,6 +4,8 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/lib/i18n/I18nProvider'
+import { LanguageSwitcher } from '@/components/language-switcher'
 
 interface Student { id: string; studentNumber: string; name: string }
 interface GroupMember { id: string; student: Student }
@@ -12,6 +14,7 @@ interface Group { id: string; groupNumber: number; aiRole: string; members: Grou
 export default function GroupManagementPage() {
   const router = useRouter()
   const params = useParams()
+  const { t } = useI18n()
   const [groups, setGroups] = useState<Group[]>([])
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('teacher_token') : null
@@ -65,24 +68,26 @@ export default function GroupManagementPage() {
     <div className="max-w-4xl mx-auto p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link href={`/teacher/activities/${params.id}`} className="text-gray-400 hover:text-gray-600 transition">
-          ← 返回
+          ← {t('common.back')}
         </Link>
-        <h1 className="text-2xl font-bold">分组管理</h1>
+        <h1 className="text-2xl font-bold">{t('groups.title')}</h1>
+        <div className="flex-1" />
+        <LanguageSwitcher />
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-6">
         {groups.map((group) => (
           <Card key={group.id}>
             <div className="flex justify-between items-center mb-3">
-              <h3 className="font-semibold">第 {group.groupNumber} 组</h3>
+              <h3 className="font-semibold">{t('activity.group_n', { n: group.groupNumber })}</h3>
               <select
                 className="border rounded px-2 py-1 text-sm"
                 value={group.aiRole}
                 onChange={(e) => handleChangeAiRole(group.id, e.target.value)}
               >
-                <option value="system_helper">系统助手</option>
-                <option value="known_ai_peer">已知AI同伴</option>
-                <option value="hidden_ai_peer">隐藏AI同伴</option>
+                <option value="system_helper">{t('activity.ai_role.system_helper')}</option>
+                <option value="known_ai_peer">{t('activity.ai_role.known_ai_peer')}</option>
+                <option value="hidden_ai_peer">{t('activity.ai_role.hidden_ai_peer')}</option>
               </select>
             </div>
 
@@ -96,7 +101,7 @@ export default function GroupManagementPage() {
                     onChange={(e) => handleMoveStudent(m.student.id, e.target.value)}
                   >
                     {groups.map((g) => (
-                      <option key={g.id} value={g.id}>第 {g.groupNumber} 组</option>
+                      <option key={g.id} value={g.id}>{t('activity.group_n', { n: g.groupNumber })}</option>
                     ))}
                   </select>
                 </div>
@@ -107,8 +112,8 @@ export default function GroupManagementPage() {
       </div>
 
       <div className="flex gap-4">
-        <Button onClick={handleReshuffle} className="bg-gray-600 hover:bg-gray-700">重新随机分组</Button>
-        <Button onClick={handleConfirm}>确认分组并开始</Button>
+        <Button onClick={handleReshuffle} className="bg-gray-600 hover:bg-gray-700">{t('groups.reshuffle')}</Button>
+        <Button onClick={handleConfirm}>{t('groups.confirm_start')}</Button>
       </div>
     </div>
   )

@@ -5,9 +5,12 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { AiConfigForm } from '@/components/ai-config-form'
+import { useI18n } from '@/lib/i18n/I18nProvider'
+import { LanguageSwitcher } from '@/components/language-switcher'
 
 export default function NewActivityPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [title, setTitle] = useState('')
   const [pdf, setPdf] = useState<File | null>(null)
   const [aiConfig, setAiConfig] = useState<Record<string, unknown>>({ role: 'system_helper' })
@@ -55,15 +58,18 @@ export default function NewActivityPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">创建新活动</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">{t('new.title')}</h1>
+        <LanguageSwitcher />
+      </div>
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
-          <h3 className="font-semibold mb-3">基本信息</h3>
-          <Input placeholder="活动标题" value={title} onChange={(e) => setTitle(e.target.value)} required />
+          <h3 className="font-semibold mb-3">{t('new.basic_info')}</h3>
+          <Input placeholder={t('new.activity_title')} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </Card>
 
         <Card>
-          <h3 className="font-semibold mb-3">上传 PDF 课件</h3>
+          <h3 className="font-semibold mb-3">{t('new.upload_pdf_title')}</h3>
           <input
             type="file"
             accept=".pdf"
@@ -73,26 +79,26 @@ export default function NewActivityPage() {
         </Card>
 
         <Card>
-          <h3 className="font-semibold mb-3">分组设置</h3>
+          <h3 className="font-semibold mb-3">{t('new.group_settings')}</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm mb-1">最少人数</label>
+              <label className="block text-sm mb-1">{t('new.group_min')}</label>
               <Input type="number" min={2} max={4} value={groupMin} onChange={(e) => setGroupMin(Number(e.target.value))} />
             </div>
             <div>
-              <label className="block text-sm mb-1">最多人数</label>
+              <label className="block text-sm mb-1">{t('new.group_max')}</label>
               <Input type="number" min={2} max={4} value={groupMax} onChange={(e) => setGroupMax(Number(e.target.value))} />
             </div>
           </div>
         </Card>
 
         <Card>
-          <h3 className="font-semibold mb-3">AI 设置</h3>
+          <h3 className="font-semibold mb-3">{t('new.ai_settings')}</h3>
           <AiConfigForm value={aiConfig} onChange={setAiConfig} />
         </Card>
 
         <Button type="submit" className="w-full" disabled={loading || !title}>
-          {loading ? '创建中...' : '创建并发布活动'}
+          {loading ? t('new.creating') : t('new.create_button')}
         </Button>
       </form>
     </div>

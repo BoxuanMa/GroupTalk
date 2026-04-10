@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireTeacher, unauthorized } from '@/lib/middleware'
 import { generateConceptMap, generatePdfConceptMap } from '@/lib/concept-map-generator'
+import { normalizeNodes, normalizeEdges } from '@/lib/concept-map-normalize'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -14,7 +15,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       include: { group: true },
       orderBy: [{ group: { groupNumber: 'asc' } }, { type: 'asc' }],
     })
-    return NextResponse.json({ conceptMaps: maps })
+    // Normalize on read so legacy records (saved in ReactFlow nested shape)
+    // come back in the canonical flat schema the UI expects.
+    const conceptMaps = maps.map((m) => ({
+      ...m,
+      nodes: normalizeNodes(m.nodes),
+      edges: normalizeEdges(m.edges),
+    }))
+    return NextResponse.json({ conceptMaps })
   } catch {
     return unauthorized()
   }

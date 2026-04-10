@@ -18,16 +18,31 @@ export async function POST(request: NextRequest) {
   }
 
   const activity = await prisma.activity.findUnique({ where: { joinCode } })
-  if (!activity || activity.status !== 'waiting') {
+  if (!activity || (activity.status !== 'waiting' && activity.status !== 'active')) {
     return NextResponse.json({ error: 'Invalid or inactive join code' }, { status: 404 })
   }
 
-  const student = await prisma.student.upsert({
+  // During 'active', only allow rejoin of previously-enrolled students (no new signups)
+  const existing = await prisma.student.findUnique({
     where: { studentNumber_activityId: { studentNumber, activityId: activity.id } },
-    update: { name },
-    create: { studentNumber, name, activityId: activity.id },
   })
+  if (activity.status === 'active' && !existing) {
+    return NextResponse.json({ error: 'Activity already started' }, { status: 403 })
+  }
+  const student = existing
+    ? await prisma.student.update({
+        where: { studentNumber_activityId: { studentNumber, activityId: activity.id } },
+        data: { name },
+      })
+    : await prisma.student.create({
+        data: { studentNumber, name, activityId: activity.id },
+      })
 
   const token = signToken({ userId: student.id, role: 'student', activityId: activity.id })
-  return NextResponse.json({ token, student: { id: student.id, studentNumber, name }, activityId: activity.id })
+  return NextResponse.json({
+    token,
+    student: { id: student.id, studentNumber, name },
+    activityId: activity.id,
+    status: activity.status,
+  })
 }

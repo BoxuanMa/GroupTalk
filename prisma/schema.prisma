@@ -23,6 +23,7 @@ enum AiRole {
 enum SenderType {
   student
   ai
+  teacher
 }
 
 enum UserType {
@@ -103,6 +104,8 @@ model Message {
   content    String
   timestamp  DateTime   @default(now())
   aiMetadata Json?
+
+  @@index([groupId, timestamp])
 }
 
 model ConceptMap {
@@ -111,7 +114,7 @@ model ConceptMap {
   activity        Activity  @relation(fields: [activityId], references: [id])
   groupId         String
   group           Group     @relation(fields: [groupId], references: [id])
-  type            String    // pdf_based or chat_based
+  type            String // pdf_based or chat_based
   nodes           Json      @default("[]")
   edges           Json      @default("[]")
   originalNodes   Json      @default("[]")
@@ -130,4 +133,6 @@ model ActivityLog {
   action     String
   metadata   Json     @default("{}")
   timestamp  DateTime @default(now())
+
+  @@index([activityId, timestamp])
 }

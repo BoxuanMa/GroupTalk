@@ -5,9 +5,12 @@ import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/lib/i18n/I18nProvider'
+import { LanguageSwitcher } from '@/components/language-switcher'
 
 export default function TeacherLoginPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -23,8 +26,8 @@ export default function TeacherLoginPage() {
     })
 
     if (!res.ok) {
-      const data = await res.json()
-      setError(data.error || '登录失败')
+      const data = await res.json().catch(() => ({}))
+      setError(data.error || t('teacher.login.failed'))
       return
     }
 
@@ -36,15 +39,32 @@ export default function TeacherLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <Card className="max-w-sm w-full">
-        <h2 className="text-xl font-bold mb-4">老师登录</h2>
+        <h2 className="text-xl font-bold mb-4">{t('teacher.login.title')}</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input placeholder="用户名" value={username} onChange={(e) => setUsername(e.target.value)} />
-          <Input type="password" placeholder="密码" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Input
+            placeholder={t('teacher.login.username')}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <Input
+            type="password"
+            placeholder={t('teacher.login.password')}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
           {error && <p className="text-red-500 text-sm">{error}</p>}
-          <Button type="submit" className="w-full">登录</Button>
+          <Button type="submit" className="w-full">
+            {t('teacher.login.submit')}
+          </Button>
           <p className="text-sm text-center text-gray-500">
-            没有账号？<Link href="/teacher/register" className="text-blue-600">注册</Link>
+            {t('teacher.login.no_account')}{' '}
+            <Link href="/teacher/register" className="text-blue-600">
+              {t('teacher.login.go_register')}
+            </Link>
           </p>
         </form>
       </Card>

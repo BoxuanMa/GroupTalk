@@ -4,9 +4,12 @@ import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/lib/i18n/I18nProvider'
+import { LanguageSwitcher } from '@/components/language-switcher'
 
 export default function TeacherRegisterPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -24,7 +27,7 @@ export default function TeacherRegisterPage() {
 
     if (!res.ok) {
       const data = await res.json()
-      setError(data.error || '注册失败')
+      setError(data.error || t('teacher.register.failed'))
       return
     }
 
@@ -37,13 +40,16 @@ export default function TeacherRegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <Card className="max-w-sm w-full">
-        <h2 className="text-xl font-bold mb-4">老师注册</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">{t('teacher.register.title')}</h2>
+          <LanguageSwitcher />
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input placeholder="用户名" value={username} onChange={(e) => setUsername(e.target.value)} />
-          <Input placeholder="姓名" value={name} onChange={(e) => setName(e.target.value)} />
-          <Input type="password" placeholder="密码" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Input placeholder={t('teacher.login.username')} value={username} onChange={(e) => setUsername(e.target.value)} />
+          <Input placeholder={t('teacher.register.name')} value={name} onChange={(e) => setName(e.target.value)} />
+          <Input type="password" placeholder={t('teacher.login.password')} value={password} onChange={(e) => setPassword(e.target.value)} />
           {error && <p className="text-red-500 text-sm">{error}</p>}
-          <Button type="submit" className="w-full">注册</Button>
+          <Button type="submit" className="w-full">{t('teacher.register.submit')}</Button>
         </form>
       </Card>
     </div>

@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { ConceptMapEditor } from '@/components/concept-map-editor'
 import { Button } from '@/components/ui/button'
 import { Node, Edge } from 'reactflow'
+import { useI18n } from '@/lib/i18n/I18nProvider'
+import { LanguageSwitcher } from '@/components/language-switcher'
 
 interface StoredNode {
   id: string
@@ -30,6 +32,7 @@ interface ConceptMap {
 
 export default function ConceptMapsPage() {
   const params = useParams()
+  const { t } = useI18n()
   const [maps, setMaps] = useState<ConceptMap[]>([])
   const [currentGroupIndex, setCurrentGroupIndex] = useState(0)
   const [generating, setGenerating] = useState(false)
@@ -45,13 +48,13 @@ export default function ConceptMapsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) {
-        setError(`加载失败 (${res.status})`)
+        setError(`${t('common.load_failed')} (${res.status})`)
         return
       }
       const data = await res.json()
       setMaps(data.conceptMaps || [])
     } catch (e) {
-      setError('网络错误')
+      setError(t('common.network_error'))
       console.error('loadMaps error:', e)
     } finally {
       setLoading(false)
@@ -61,7 +64,7 @@ export default function ConceptMapsPage() {
   useEffect(() => { loadMaps() }, [params.id])
 
   async function handleGenerate(isRegenerate = false) {
-    if (isRegenerate && !confirm('重新生成会覆盖现有概念图（已编辑的修改将丢失），并消耗 API token。确定要重新生成吗？')) return
+    if (isRegenerate && !confirm(t('concept.regenerate_warn'))) return
     const token = localStorage.getItem('teacher_token')
     setGenerating(true)
     try {
@@ -71,13 +74,13 @@ export default function ConceptMapsPage() {
       })
       if (!res.ok) {
         const msg = await res.text().catch(() => '')
-        alert(`生成失败 (${res.status}) ${msg}`)
+        alert(`${t('concept.generate_failed')} (${res.status}) ${msg}`)
         return
       }
       await loadMaps()
     } catch (e) {
       console.error('handleGenerate error:', e)
-      alert('生成失败：网络错误')
+      alert(`${t('concept.generate_failed')}: ${t('common.network_error')}`)
     } finally {
       setGenerating(false)
     }
@@ -92,13 +95,13 @@ export default function ConceptMapsPage() {
         body: JSON.stringify({ nodes, edges }),
       })
       if (!res.ok) {
-        alert(`保存失败 (${res.status})`)
+        alert(`${t('concept.save_failed')} (${res.status})`)
         return
       }
-      alert('保存成功')
+      alert(t('concept.save_success'))
     } catch (e) {
       console.error('handleSave error:', e)
-      alert('保存失败：网络错误')
+      alert(`${t('concept.save_failed')}: ${t('common.network_error')}`)
     }
   }
 
@@ -131,7 +134,7 @@ export default function ConceptMapsPage() {
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto p-6 text-center">
-        <p className="text-gray-400 py-12">加载中...</p>
+        <p className="text-gray-400 py-12">{t('common.loading')}</p>
       </div>
     )
   }
@@ -140,10 +143,10 @@ export default function ConceptMapsPage() {
     return (
       <div className="max-w-4xl mx-auto p-6 text-center">
         <Link href={`/teacher/activities/${params.id}`} className="text-gray-400 hover:text-gray-600 transition text-sm">
-          ← 返回活动
+          ← {t('common.back')}
         </Link>
         <p className="text-red-500 mt-4">{error}</p>
-        <Button onClick={loadMaps} className="mt-2">重试</Button>
+        <Button onClick={loadMaps} className="mt-2">{t('common.retry')}</Button>
       </div>
     )
   }
@@ -152,11 +155,11 @@ export default function ConceptMapsPage() {
     return (
       <div className="max-w-4xl mx-auto p-6 text-center">
         <Link href={`/teacher/activities/${params.id}`} className="text-gray-400 hover:text-gray-600 transition text-sm">
-          ← 返回活动
+          ← {t('common.back')}
         </Link>
-        <h1 className="text-2xl font-bold mb-6 mt-4">概念图</h1>
+        <h1 className="text-2xl font-bold mb-6 mt-4">{t('concept.title')}</h1>
         <Button onClick={() => handleGenerate(false)} disabled={generating}>
-          {generating ? '生成中...' : '生成概念图'}
+          {generating ? t('concept.generating') : t('concept.generate')}
         </Button>
       </div>
     )
@@ -167,9 +170,9 @@ export default function ConceptMapsPage() {
       <div className="flex items-center justify-between p-3 border-b">
         <div className="flex items-center gap-3">
           <Link href={`/teacher/activities/${params.id}`} className="text-gray-400 hover:text-gray-600 transition">
-            ← 返回
+            ← {t('common.back')}
           </Link>
-          <h1 className="font-bold">概念图</h1>
+          <h1 className="font-bold">{t('concept.title')}</h1>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -179,7 +182,7 @@ export default function ConceptMapsPage() {
           >
             ◀
           </Button>
-          <span>第 {currentGroupNum} 组</span>
+          <span>{t('concept.group_n', { n: currentGroupNum })}</span>
           <Button
             onClick={() => setCurrentGroupIndex((i) => Math.min(groupNumbers.length - 1, i + 1))}
             disabled={currentGroupIndex >= groupNumbers.length - 1}
@@ -192,8 +195,9 @@ export default function ConceptMapsPage() {
             disabled={generating}
             className="ml-4 px-3 py-1 text-sm bg-orange-100 text-orange-700 hover:bg-orange-200"
           >
-            {generating ? '生成中...' : '重新生成'}
+            {generating ? t('concept.generating') : t('concept.regenerate')}
           </Button>
+          <LanguageSwitcher className="ml-2" />
         </div>
       </div>
 
@@ -205,10 +209,10 @@ export default function ConceptMapsPage() {
               initialNodes={toFlowNodes(pdfMap)}
               initialEdges={toFlowEdges(pdfMap)}
               onSave={(nodes, edges) => handleSave(pdfMap.id, nodes, edges)}
-              title="PDF 概念图"
+              title={t('concept.pdf_map')}
             />
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">无 PDF 概念图</div>
+            <div className="flex items-center justify-center h-full text-gray-400">{t('concept.no_pdf_map')}</div>
           )}
         </div>
         <div className="w-1/2">
@@ -218,10 +222,10 @@ export default function ConceptMapsPage() {
               initialNodes={toFlowNodes(chatMap)}
               initialEdges={toFlowEdges(chatMap)}
               onSave={(nodes, edges) => handleSave(chatMap.id, nodes, edges)}
-              title="聊天概念图"
+              title={t('concept.chat_map')}
             />
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">无聊天概念图</div>
+            <div className="flex items-center justify-center h-full text-gray-400">{t('concept.no_chat_map')}</div>
           )}
         </div>
       </div>

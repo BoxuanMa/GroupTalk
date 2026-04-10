@@ -8,15 +8,16 @@ import { ChatMessage, getAvatarColor } from '@/components/chat-message'
 interface Message {
   id: string
   senderId: string | null
-  senderType: 'student' | 'ai'
+  senderType: 'student' | 'ai' | 'teacher'
   senderName: string
   content: string
   timestamp: string
 }
 
 interface Member {
+  id?: string
   name: string
-  type?: 'student' | 'ai'
+  type?: 'student' | 'ai' | 'teacher'
 }
 
 interface ChatPanelProps {
@@ -26,8 +27,18 @@ interface ChatPanelProps {
   members: Array<Member>
 }
 
-export function ChatPanel({ socket, groupId, currentUserId, members }: ChatPanelProps) {
+export function ChatPanel({ socket, groupId, currentUserId, members: initialMembers }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
+  const [teachers, setTeachers] = useState<Map<string, string>>(new Map())
+  // Merge base members with currently-present teachers
+  const members: Member[] = [
+    ...initialMembers,
+    ...Array.from(teachers.entries()).map(([id, name]) => ({
+      id,
+      name,
+      type: 'teacher' as const,
+    })),
+  ]
   const [input, setInput] = useState('')
   const [showMention, setShowMention] = useState(false)
   const [mentionFilter, setMentionFilter] = useState('')
@@ -40,7 +51,7 @@ export function ChatPanel({ socket, groupId, currentUserId, members }: ChatPanel
 
   useEffect(() => {
     if (!groupId) return
-    const token = sessionStorage.getItem('student_token') || localStorage.getItem('teacher_token')
+    const token = localStorage.getItem("student_token") || localStorage.getItem('teacher_token')
     fetch(`/api/messages/${groupId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -62,6 +73,26 @@ export function ChatPanel({ socket, groupId, currentUserId, members }: ChatPanel
       })
     })
 
+    socket.on('teacher-roster', (list: Array<{ id: string; name: string }>) => {
+      setTeachers(new Map(list.map((t) => [t.id, t.name])))
+    })
+
+    socket.on('teacher-joined', (data: { id: string; name: string }) => {
+      setTeachers((prev) => {
+        const next = new Map(prev)
+        next.set(data.id, data.name)
+        return next
+      })
+    })
+
+    socket.on('teacher-left', (data: { id: string }) => {
+      setTeachers((prev) => {
+        const next = new Map(prev)
+        next.delete(data.id)
+        return next
+      })
+    })
+
     socket.on('user-typing', (data: { userId: string; name: string; isTyping: boolean }) => {
       setTypingUsers((prev) => {
         const next = new Map(prev)
@@ -77,6 +108,9 @@ export function ChatPanel({ socket, groupId, currentUserId, members }: ChatPanel
     return () => {
       socket.off('new-message')
       socket.off('user-typing')
+      socket.off('teacher-roster')
+      socket.off('teacher-joined')
+      socket.off('teacher-left')
     }
   }, [socket])
 
@@ -177,12 +211,19 @@ export function ChatPanel({ socket, groupId, currentUserId, members }: ChatPanel
       <div className="p-2 border-b bg-gray-50 flex items-center gap-3">
         <span className="text-sm text-gray-500">成员:</span>
         {members.map((m) => (
-          <div key={m.name} className="flex items-center gap-1">
-            <div className={`w-6 h-6 rounded-full ${m.type === 'ai' ? 'bg-purple-500' : getAvatarColor(m.name)} flex items-center justify-center text-white text-xs font-bold`}>
-              {m.type === 'ai' ? '🤖' : m.name.charAt(0).toUpperCase()}
+          <div key={`${m.type ?? 'student'}-${m.id ?? m.name}`} className="flex items-center gap-1">
+            <div className={`w-6 h-6 rounded-full ${
+              m.type === 'ai'
+                ? 'bg-purple-500'
+                : m.type === 'teacher'
+                  ? 'bg-amber-500'
+                  : getAvatarColor(m.name)
+            } flex items-center justify-center text-white text-xs font-bold`}>
+              {m.type === 'ai' ? '🤖' : m.type === 'teacher' ? '👩‍🏫' : m.name.charAt(0).toUpperCase()}
             </div>
             <span className="text-sm">{m.name}</span>
             {m.type === 'ai' && <span className="px-1 bg-purple-100 text-purple-700 rounded text-[10px]">AI</span>}
+            {m.type === 'teacher' && <span className="px-1 bg-amber-100 text-amber-700 rounded text-[10px]">Teacher</span>}
           </div>
         ))}
       </div>
