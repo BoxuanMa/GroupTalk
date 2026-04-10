@@ -11,6 +11,7 @@ function getOpenAI() {
 
 interface ChatMessage {
   senderName: string
+  senderType: string
   content: string
 }
 
@@ -22,12 +23,24 @@ export function buildPrompt(params: {
 }): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   const { systemPrompt, pdfSummary, chatHistory, maxMessages = 30 } = params
 
-  const system = `${systemPrompt}\n\n课件内容摘要：\n${pdfSummary}`
+  let system = systemPrompt + '\n\n【格式要求】直接输出你要说的内容，不要在回复前面加任何人名或冒号前缀。'
+  if (pdfSummary) {
+    system += '\n\n'
+    system += '【重要】以下是本次讨论的课件/学习材料的完整内容，你必须仔细阅读并基于这些内容参与讨论、回答问题。'
+    system += '当学生提问时，优先从课件内容中寻找答案和依据。\n\n'
+    system += '=== 课件内容 ===\n'
+    system += pdfSummary
+    system += '\n=== 课件内容结束 ==='
+  }
 
-  const recentMessages = chatHistory.slice(-maxMessages).map((msg) => ({
-    role: 'user' as const,
-    content: `${msg.senderName}: ${msg.content}`,
-  }))
+  console.log(`[AI] buildPrompt: system ${system.length} chars, pdf ${pdfSummary.length} chars, ${chatHistory.length} msgs`)
+
+  const recentMessages = chatHistory.slice(-maxMessages).map((msg) => {
+    if (msg.senderType === 'ai') {
+      return { role: 'assistant' as const, content: msg.content }
+    }
+    return { role: 'user' as const, content: `${msg.senderName}: ${msg.content}` }
+  })
 
   return [{ role: 'system', content: system }, ...recentMessages]
 }
@@ -38,6 +51,8 @@ const lastAiMessage = new Map<string, number>()
 const lastGroupMessage = new Map<string, number>()
 // Active silence timers per group
 const silenceTimers = new Map<string, NodeJS.Timeout>()
+// Per-group lock to prevent concurrent AI triggers
+const aiLocks = new Set<string>()
 
 export function startSilenceTimer(groupId: string, activityId: string, thresholdMs: number) {
   const existing = silenceTimers.get(groupId)
@@ -67,7 +82,12 @@ export async function shouldTriggerAi(
   config: AiConfig,
   mentionedAi: boolean
 ): Promise<boolean> {
-  if (config.triggerMode === 'mention_only' && !mentionedAi) {
+  // @mention always bypasses frequency limit and trigger mode
+  if (mentionedAi) {
+    return true
+  }
+
+  if (config.triggerMode === 'mention_only') {
     return false
   }
 
@@ -85,8 +105,9 @@ export async function generateAiResponse(params: {
   activityId: string
   config: AiConfig
   pdfSummary: string
+  pdfImages?: string[]
 }): Promise<{ content: string; metadata: Record<string, unknown> } | null> {
-  const { groupId, config, pdfSummary } = params
+  const { groupId, config, pdfSummary, pdfImages } = params
 
   const messages = await prisma.message.findMany({
     where: { groupId },
@@ -96,6 +117,7 @@ export async function generateAiResponse(params: {
 
   const chatHistory = messages.reverse().map((m) => ({
     senderName: m.senderName,
+    senderType: m.senderType,
     content: m.content,
   }))
 
@@ -105,12 +127,35 @@ export async function generateAiResponse(params: {
     chatHistory,
   })
 
+  // If we have PDF images, inject them as a user message (OpenAI only allows images in 'user' role)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let apiMessages: any[] = prompt
+  if (pdfImages && pdfImages.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfUserMessage: any = {
+      role: 'user',
+      content: [
+        { type: 'text', text: '【课件内容】以下是本次讨论的课件页面截图，请仔细查看并基于图中信息参与讨论和回答问题：' },
+        ...pdfImages.map((img) => ({
+          type: 'image_url',
+          image_url: { url: `data:image/png;base64,${img}`, detail: 'low' as const },
+        })),
+      ],
+    }
+    // system prompt -> PDF images (as user) -> chat history
+    apiMessages = [
+      prompt[0], // system
+      pdfUserMessage,
+      ...prompt.slice(1), // chat messages
+    ]
+  }
+
   const startTime = Date.now()
 
   try {
     const completion = await getOpenAI().chat.completions.create({
       model: config.model,
-      messages: prompt,
+      messages: apiMessages,
       temperature: config.temperature,
       max_tokens: 500,
     })
@@ -124,8 +169,9 @@ export async function generateAiResponse(params: {
       content: responseContent,
       metadata: {
         model: config.model,
-        prompt: prompt,
+        messageCount: prompt.length,
         response: responseContent,
+        pdfMode: pdfImages ? 'vision' : 'text',
         tokens: {
           prompt: completion.usage?.prompt_tokens,
           completion: completion.usage?.completion_tokens,
@@ -140,7 +186,28 @@ export async function generateAiResponse(params: {
   }
 }
 
+/** Stop all silence timers for groups belonging to an activity */
+export async function stopTimersForActivity(activityId: string) {
+  const groups = await prisma.group.findMany({
+    where: { activityId },
+    select: { id: true },
+  })
+  for (const g of groups) stopSilenceTimer(g.id)
+}
+
 export async function handleAiTrigger(groupId: string, activityId: string) {
+  // Per-group lock: skip if another trigger is already running
+  if (aiLocks.has(groupId)) return
+  aiLocks.add(groupId)
+
+  try {
+    await _handleAiTriggerInner(groupId, activityId)
+  } finally {
+    aiLocks.delete(groupId)
+  }
+}
+
+async function _handleAiTriggerInner(groupId: string, activityId: string) {
   const group = await prisma.group.findUnique({
     where: { id: groupId },
     include: { activity: true },
@@ -163,6 +230,9 @@ export async function handleAiTrigger(groupId: string, activityId: string) {
 
   if (!(await shouldTriggerAi(groupId, config, mentionedAi))) return
 
+  // Set optimistically to prevent concurrent triggers
+  lastAiMessage.set(groupId, Date.now())
+
   // Show typing indicator
   const io = getIO()
   if (io) {
@@ -174,11 +244,38 @@ export async function handleAiTrigger(groupId: string, activityId: string) {
   }
 
   let pdfSummary = ''
+  let pdfImages: string[] | undefined
   if (group.activity.pdfUrl) {
-    pdfSummary = '(PDF content available)'
+    try {
+      const { extractPdfText, isTextReadable, pdfToImages } = await import('./concept-map-generator')
+
+      // Try cached text first
+      let text = group.activity.pdfText as string | null
+      if (!text) {
+        text = await extractPdfText(group.activity.pdfUrl)
+        // Cache for next time
+        await prisma.activity.update({
+          where: { id: activityId },
+          data: { pdfText: text },
+        })
+      }
+
+      if (text && isTextReadable(text)) {
+        // Good text — use it
+        pdfSummary = text.slice(0, 8000)
+        console.log(`[AI] PDF mode: text (${pdfSummary.length} chars)`)
+      } else {
+        // Bad text (scanned/image PDF) — fall back to vision
+        console.log(`[AI] PDF text unreadable, switching to vision mode`)
+        pdfImages = await pdfToImages(group.activity.pdfUrl, 4)
+        console.log(`[AI] PDF mode: vision (${pdfImages.length} pages)`)
+      }
+    } catch (err) {
+      console.error('[AI] PDF processing failed:', err)
+    }
   }
 
-  const result = await generateAiResponse({ groupId, activityId, config, pdfSummary })
+  const result = await generateAiResponse({ groupId, activityId, config, pdfSummary, pdfImages })
 
   // Stop typing indicator
   if (io) {

@@ -1,5 +1,13 @@
 const requests = new Map<string, { count: number; resetAt: number }>()
 
+// Periodically evict expired entries to prevent unbounded memory growth
+setInterval(() => {
+  const now = Date.now()
+  requests.forEach((v, k) => {
+    if (now > v.resetAt) requests.delete(k)
+  })
+}, 60_000).unref()
+
 export function rateLimit(key: string, maxRequests: number, windowMs: number): boolean {
   const now = Date.now()
   const entry = requests.get(key)

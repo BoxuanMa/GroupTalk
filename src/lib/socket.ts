@@ -51,15 +51,13 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
       const payload = verifyToken(token)
       socket.data.user = payload
       next()
-    } catch (err) {
-      console.log('[Socket.IO] auth failed:', err)
+    } catch {
       next(new Error('Authentication failed'))
     }
   })
 
   io.on('connection', (socket) => {
     const user = socket.data.user
-    console.log('[Socket.IO] client connected:', user.userId, user.role)
 
     // Join group room
     socket.on('join-group', async (groupId: string) => {
@@ -129,6 +127,10 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
       const groupId = socket.data.groupId
       if (!groupId) return socket.emit('error', 'Not in a group')
 
+      // Validate message content
+      const content = typeof data.content === 'string' ? data.content.trim() : ''
+      if (!content || content.length > 5000) return socket.emit('error', 'Invalid message')
+
       // Rate limit
       if (!rateLimit(`chat:${user.userId}`, 30, 60_000)) {
         return socket.emit('error', 'Rate limit exceeded')
@@ -143,18 +145,9 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
         return socket.emit('error', 'Discussion has ended')
       }
 
-      // Resolve sender display name and type
-      let senderName = 'Unknown'
-      let senderType: 'student' | 'teacher' = 'student'
-      if (user.role === 'student') {
-        const student = await prisma.student.findUnique({ where: { id: user.userId } })
-        senderName = student?.name || 'Unknown'
-        senderType = 'student'
-      } else if (user.role === 'teacher') {
-        const teacher = await prisma.teacher.findUnique({ where: { id: user.userId } })
-        senderName = teacher?.name || 'Teacher'
-        senderType = 'teacher'
-      }
+      // Use cached name from join-group to avoid redundant DB queries
+      const senderName = socket.data.userName || 'Unknown'
+      const senderType: 'student' | 'teacher' = user.role === 'teacher' ? 'teacher' : 'student'
 
       const message = await prisma.message.create({
         data: {
@@ -162,7 +155,7 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
           senderId: user.userId,
           senderType,
           senderName,
-          content: data.content,
+          content,
         },
       })
 
@@ -183,31 +176,28 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
         metadata: { groupId, messageId: message.id },
       })
 
-      // Trigger AI response check
-      setTimeout(async () => {
-        try {
-          const { handleAiTrigger } = await import('./ai-engine')
-          console.log('[AI] triggering for group:', groupId)
-          await handleAiTrigger(groupId, socket.data.activityId)
-        } catch (err) {
-          console.error('[AI] trigger error:', err)
-        }
-      }, 2000 + Math.random() * 3000)
-
-      // Reset silence timer for AI auto-trigger on conversation lulls
+      // AI trigger logic: @mention → immediate trigger; otherwise → silence timer only
       try {
-        const { resetSilenceTimer } = await import('./ai-engine')
+        const { handleAiTrigger, resetSilenceTimer } = await import('./ai-engine')
+        const { mergeAiConfig } = await import('./ai-config')
         const groupData = await prisma.group.findUnique({
           where: { id: groupId },
           include: { activity: true },
         })
         if (groupData) {
-          const { mergeAiConfig } = await import('./ai-config')
           const config = mergeAiConfig(
             groupData.activity.aiConfig as Record<string, unknown>,
             groupData.aiConfig as Record<string, unknown> | null
           )
-          if (config.silenceThreshold > 0 && config.triggerMode !== 'mention_only') {
+
+          const isMention = content.includes(`@${config.displayName}`) ||
+            content.includes('@AI') || content.includes('@ai')
+
+          if (isMention) {
+            // @mention: trigger after a short natural delay
+            setTimeout(() => handleAiTrigger(groupId, socket.data.activityId), 1500 + Math.random() * 1500)
+          } else if (config.silenceThreshold > 0 && config.triggerMode !== 'mention_only') {
+            // Auto mode: only use silence timer (resets on each new message)
             resetSilenceTimer(groupId, socket.data.activityId, config.silenceThreshold * 1000)
           }
         }
@@ -245,7 +235,6 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOServer {
           return socket.emit('error', 'Forbidden')
         }
         socket.join(`waiting:${activityId}`)
-        console.log('[Socket.IO] join-waiting:', activityId, 'user:', user.userId)
       } catch (err) {
         console.error('[Socket.IO] join-waiting error:', err)
         socket.emit('error', 'join-waiting failed')

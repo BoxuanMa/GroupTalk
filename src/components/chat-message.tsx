@@ -1,6 +1,8 @@
+import { Bot, GraduationCap } from 'lucide-react'
+
 export const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-green-500', 'bg-orange-500', 'bg-pink-500',
-  'bg-teal-500', 'bg-indigo-500', 'bg-red-500', 'bg-cyan-500',
+  'bg-blue-500', 'bg-emerald-500', 'bg-orange-500', 'bg-pink-500',
+  'bg-teal-500', 'bg-indigo-500', 'bg-rose-500', 'bg-cyan-500',
 ]
 
 export function getAvatarColor(name: string): string {
@@ -25,33 +27,33 @@ export function ChatMessage({ senderName, senderType, content, timestamp, isOwn 
   const time = new Date(timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   const initial = senderName.charAt(0).toUpperCase()
   const avatarColor = isAi
-    ? 'bg-purple-500'
+    ? 'bg-violet-500'
     : isTeacher
-      ? 'bg-amber-500'
+      ? 'bg-orange-500'
       : getAvatarColor(senderName)
   const bubbleClass = isOwn
-    ? 'bg-blue-500 text-white'
+    ? 'bg-indigo-600 text-white'
     : isAi
-      ? 'bg-purple-100'
+      ? 'bg-violet-50 border border-violet-200'
       : isTeacher
-        ? 'bg-amber-50 border border-amber-300'
-        : 'bg-gray-100'
+        ? 'bg-orange-50 border border-orange-200'
+        : 'bg-white border border-slate-200'
 
   return (
-    <div className={`flex ${isOwn ? 'flex-row-reverse' : 'flex-row'} items-start gap-2 mb-3`}>
-      <div className={`flex-shrink-0 w-8 h-8 rounded-full ${avatarColor} flex items-center justify-center text-white text-sm font-bold`}>
-        {isAi ? '🤖' : isTeacher ? '👩‍🏫' : initial}
+    <div className={`flex ${isOwn ? 'flex-row-reverse' : 'flex-row'} items-start gap-2.5 mb-4`}>
+      <div className={`flex-shrink-0 w-8 h-8 rounded-full ${avatarColor} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
+        {isAi ? <Bot className="w-4 h-4" /> : isTeacher ? <GraduationCap className="w-4 h-4" /> : initial}
       </div>
-      <div className={`max-w-[70%] ${bubbleClass} rounded-lg px-3 py-2`}>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-semibold opacity-80">
+      <div className={`max-w-[70%] ${bubbleClass} rounded-2xl ${isOwn ? 'rounded-tr-md' : 'rounded-tl-md'} px-3.5 py-2.5`}>
+        <div className="flex items-center gap-2 mb-0.5">
+          <span className={`text-xs font-semibold ${isOwn ? 'text-indigo-200' : 'text-slate-600'}`}>
             {senderName}
-            {isAi && <span className="ml-1 px-1 bg-purple-200 text-purple-800 rounded text-[10px]">AI</span>}
-            {isTeacher && <span className="ml-1 px-1 bg-amber-200 text-amber-800 rounded text-[10px]">Teacher</span>}
+            {isAi && <span className="ml-1.5 px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[10px] font-medium">AI</span>}
+            {isTeacher && <span className="ml-1.5 px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px] font-medium">Teacher</span>}
           </span>
-          <span className="text-[10px] opacity-50">{time}</span>
+          <span className={`text-[10px] ${isOwn ? 'text-indigo-300' : 'text-slate-400'}`}>{time}</span>
         </div>
-        <p className="text-sm whitespace-pre-wrap">{content}</p>
+        <p className={`text-sm whitespace-pre-wrap leading-relaxed ${isOwn ? '' : 'text-slate-800'}`}>{content}</p>
       </div>
     </div>
   )

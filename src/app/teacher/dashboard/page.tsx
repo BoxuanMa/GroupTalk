@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/lib/i18n/I18nProvider'
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { Plus, Trash2, User, Users, Hash, Calendar } from 'lucide-react'
 
 interface Activity {
   id: string
@@ -16,11 +17,11 @@ interface Activity {
   _count: { students: number; groups: number }
 }
 
-const statusColors: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  waiting: 'bg-yellow-100 text-yellow-700',
-  active: 'bg-green-100 text-green-700',
-  ended: 'bg-blue-100 text-blue-700',
+const statusStyles: Record<string, { bg: string; dot: string }> = {
+  draft: { bg: 'bg-slate-50 text-slate-600 border border-slate-200', dot: 'bg-slate-400' },
+  waiting: { bg: 'bg-amber-50 text-amber-700 border border-amber-200', dot: 'bg-amber-400' },
+  active: { bg: 'bg-emerald-50 text-emerald-700 border border-emerald-200', dot: 'bg-emerald-400' },
+  ended: { bg: 'bg-indigo-50 text-indigo-700 border border-indigo-200', dot: 'bg-indigo-400' },
 }
 
 export default function DashboardPage() {
@@ -91,81 +92,119 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{t('teacher.dashboard.title')}</h1>
-        <div className="flex items-center gap-3">
-          {teacherName && (
-            <button
-              onClick={handleEditName}
-              className="text-sm text-gray-600 hover:text-blue-600 transition"
-              title={t('teacher.dashboard.edit_name')}
-            >
-              👤 {teacherName}
-            </button>
-          )}
-          <LanguageSwitcher />
-          <Link href="/teacher/activities/new">
-            <Button>{t('teacher.dashboard.new')}</Button>
-          </Link>
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-5xl mx-auto p-6">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">{t('teacher.dashboard.title')}</h1>
+            {teacherName && (
+              <button
+                onClick={handleEditName}
+                className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 transition-colors"
+                title={t('teacher.dashboard.edit_name')}
+              >
+                <User className="w-3.5 h-3.5" />
+                {teacherName}
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <Link href="/teacher/activities/new">
+              <Button size="md">
+                <Plus className="w-4 h-4" />
+                {t('teacher.dashboard.new')}
+              </Button>
+            </Link>
+          </div>
         </div>
-      </div>
 
-      <div className="flex gap-2 mb-4">
-        {[
-          { key: 'all', label: t('teacher.dashboard.filter.all') },
-          { key: 'active', label: t('teacher.dashboard.filter.active') },
-          { key: 'waiting', label: t('teacher.dashboard.filter.waiting') },
-          { key: 'ended', label: t('teacher.dashboard.filter.ended') },
-        ].map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`px-3 py-1.5 rounded-full text-sm transition ${
-              filter === f.key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {f.label} ({counts[f.key as keyof typeof counts]})
-          </button>
-        ))}
-      </div>
+        {/* Filters */}
+        <div className="flex gap-2 mb-6" role="tablist">
+          {[
+            { key: 'all', label: t('teacher.dashboard.filter.all') },
+            { key: 'active', label: t('teacher.dashboard.filter.active') },
+            { key: 'waiting', label: t('teacher.dashboard.filter.waiting') },
+            { key: 'ended', label: t('teacher.dashboard.filter.ended') },
+          ].map((f) => (
+            <button
+              key={f.key}
+              role="tab"
+              aria-selected={filter === f.key}
+              onClick={() => setFilter(f.key)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+                filter === f.key
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              {f.label} ({counts[f.key as keyof typeof counts]})
+            </button>
+          ))}
+        </div>
 
-      <div className="space-y-3">
-        {filtered.map((a) => (
-          <Link key={a.id} href={`/teacher/activities/${a.id}`}>
-            <Card className="hover:shadow-md transition cursor-pointer mb-3">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-semibold">{a.title}</h3>
-                  <p className="text-sm text-gray-500">
-                    {t('teacher.dashboard.join_code')}: {a.joinCode} · {t('teacher.dashboard.students_n', { n: a._count.students })} · {t('teacher.dashboard.groups_n', { n: a._count.groups })}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {t('teacher.dashboard.created_at', { time: new Date(a.createdAt).toLocaleString() })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-sm ${statusColors[a.status] || 'bg-gray-100'}`}>
-                    {statusLabels[a.status] || a.status}
-                  </span>
+        {/* Activity List */}
+        <div className="space-y-3">
+          {filtered.map((a) => (
+            <Link key={a.id} href={`/teacher/activities/${a.id}`} className="block">
+              <Card className="hover:shadow-md hover:border-slate-300 transition-all duration-200 cursor-pointer">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="font-semibold text-slate-900 truncate">{a.title}</h3>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${statusStyles[a.status]?.bg || 'bg-slate-100'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusStyles[a.status]?.dot || 'bg-slate-400'}`} />
+                        {statusLabels[a.status] || a.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-slate-500">
+                      <span className="inline-flex items-center gap-1">
+                        <Hash className="w-3.5 h-3.5" />
+                        {a.joinCode}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" />
+                        {t('teacher.dashboard.students_n', { n: a._count.students })}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {new Date(a.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
                   <button
                     onClick={(e) => handleDelete(e, a.id, a.title)}
-                    className="text-gray-400 hover:text-red-600 transition p-1"
+                    className="flex-shrink-0 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors ml-3"
                     title={t('teacher.dashboard.delete')}
+                    aria-label={`Delete ${a.title}`}
                   >
-                    🗑
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
-            </Card>
-          </Link>
-        ))}
+              </Card>
+            </Link>
+          ))}
 
-        {filtered.length === 0 && (
-          <p className="text-center text-gray-400 py-12">
-            {activities.length === 0 ? t('teacher.dashboard.empty') : t('teacher.dashboard.empty_filter')}
-          </p>
-        )}
+          {filtered.length === 0 && (
+            <div className="text-center py-16">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 mb-4">
+                <Users className="w-8 h-8" />
+              </div>
+              <p className="text-slate-500 text-lg font-medium">
+                {activities.length === 0 ? t('teacher.dashboard.empty') : t('teacher.dashboard.empty_filter')}
+              </p>
+              {activities.length === 0 && (
+                <Link href="/teacher/activities/new" className="inline-block mt-4">
+                  <Button variant="secondary">
+                    <Plus className="w-4 h-4" />
+                    {t('teacher.dashboard.new')}
+                  </Button>
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

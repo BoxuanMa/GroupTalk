@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Node, Edge } from 'reactflow'
 import { useI18n } from '@/lib/i18n/I18nProvider'
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { ArrowLeft, ChevronLeft, ChevronRight, RefreshCw, Loader2, GitBranch } from 'lucide-react'
 
 interface StoredNode {
   id: string
@@ -61,6 +62,7 @@ export default function ConceptMapsPage() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadMaps() }, [params.id])
 
   async function handleGenerate(isRegenerate = false) {
@@ -133,76 +135,102 @@ export default function ConceptMapsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto p-6 text-center">
-        <p className="text-gray-400 py-12">{t('common.loading')}</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mx-auto mb-3" />
+          <p className="text-slate-500">{t('common.loading')}</p>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto p-6 text-center">
-        <Link href={`/teacher/activities/${params.id}`} className="text-gray-400 hover:text-gray-600 transition text-sm">
-          ← {t('common.back')}
-        </Link>
-        <p className="text-red-500 mt-4">{error}</p>
-        <Button onClick={loadMaps} className="mt-2">{t('common.retry')}</Button>
+      <div className="min-h-screen bg-slate-50">
+        <div className="max-w-4xl mx-auto p-6 text-center">
+          <Link href={`/teacher/activities/${params.id}`} className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-700 transition-colors text-sm font-medium">
+            <ArrowLeft className="w-4 h-4" />
+            {t('common.back')}
+          </Link>
+          <p className="text-red-600 mt-6 bg-red-50 p-4 rounded-lg">{error}</p>
+          <Button onClick={loadMaps} className="mt-4">{t('common.retry')}</Button>
+        </div>
       </div>
     )
   }
 
   if (maps.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto p-6 text-center">
-        <Link href={`/teacher/activities/${params.id}`} className="text-gray-400 hover:text-gray-600 transition text-sm">
-          ← {t('common.back')}
-        </Link>
-        <h1 className="text-2xl font-bold mb-6 mt-4">{t('concept.title')}</h1>
-        <Button onClick={() => handleGenerate(false)} disabled={generating}>
-          {generating ? t('concept.generating') : t('concept.generate')}
-        </Button>
+      <div className="min-h-screen bg-slate-50">
+        <div className="max-w-4xl mx-auto p-6 text-center">
+          <Link href={`/teacher/activities/${params.id}`} className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-700 transition-colors text-sm font-medium">
+            <ArrowLeft className="w-4 h-4" />
+            {t('common.back')}
+          </Link>
+          <div className="mt-12">
+            <GitBranch className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-slate-900 mb-4">{t('concept.title')}</h1>
+            <Button onClick={() => handleGenerate(false)} disabled={generating} size="lg">
+              {generating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t('concept.generating')}
+                </>
+              ) : t('concept.generate')}
+            </Button>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      <div className="flex items-center justify-between p-3 border-b">
+    <div className="h-screen flex flex-col bg-white">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-white">
         <div className="flex items-center gap-3">
-          <Link href={`/teacher/activities/${params.id}`} className="text-gray-400 hover:text-gray-600 transition">
-            ← {t('common.back')}
+          <Link href={`/teacher/activities/${params.id}`} className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 transition-colors text-sm">
+            <ArrowLeft className="w-4 h-4" />
+            {t('common.back')}
           </Link>
-          <h1 className="font-bold">{t('concept.title')}</h1>
+          <h1 className="font-bold text-slate-800">{t('concept.title')}</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setCurrentGroupIndex((i) => Math.max(0, i - 1))}
             disabled={currentGroupIndex === 0}
-            className="px-2 py-1 text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
+            aria-label="Previous group"
           >
-            ◀
+            <ChevronLeft className="w-4 h-4" />
           </Button>
-          <span>{t('concept.group_n', { n: currentGroupNum })}</span>
+          <span className="text-sm font-medium text-slate-700 min-w-[80px] text-center">{t('concept.group_n', { n: currentGroupNum })}</span>
           <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setCurrentGroupIndex((i) => Math.min(groupNumbers.length - 1, i + 1))}
             disabled={currentGroupIndex >= groupNumbers.length - 1}
-            className="px-2 py-1 text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
+            aria-label="Next group"
           >
-            ▶
+            <ChevronRight className="w-4 h-4" />
           </Button>
+          <div className="w-px h-6 bg-slate-200 mx-1" />
           <Button
+            variant="ghost"
+            size="sm"
             onClick={() => handleGenerate(true)}
             disabled={generating}
-            className="ml-4 px-3 py-1 text-sm bg-orange-100 text-orange-700 hover:bg-orange-200"
+            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
           >
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {generating ? t('concept.generating') : t('concept.regenerate')}
           </Button>
-          <LanguageSwitcher className="ml-2" />
+          <LanguageSwitcher className="ml-1" />
         </div>
       </div>
 
       <div className="flex-1 flex">
-        <div className="w-1/2 border-r">
+        <div className="w-1/2 border-r border-slate-200">
           {pdfMap ? (
             <ConceptMapEditor
               key={`pdf-${pdfMap.id}`}
@@ -212,7 +240,10 @@ export default function ConceptMapsPage() {
               title={t('concept.pdf_map')}
             />
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">{t('concept.no_pdf_map')}</div>
+            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+              <GitBranch className="w-8 h-8 mb-2 opacity-50" />
+              {t('concept.no_pdf_map')}
+            </div>
           )}
         </div>
         <div className="w-1/2">
@@ -225,7 +256,10 @@ export default function ConceptMapsPage() {
               title={t('concept.chat_map')}
             />
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">{t('concept.no_chat_map')}</div>
+            <div className="flex flex-col items-center justify-center h-full text-slate-400">
+              <GitBranch className="w-8 h-8 mb-2 opacity-50" />
+              {t('concept.no_chat_map')}
+            </div>
           )}
         </div>
       </div>

@@ -65,7 +65,7 @@ export function parseConceptMapResponse(raw: string): ConceptMapData {
 }
 
 /** Convert PDF pages to base64 PNG images via child process (avoids webpack issues) */
-async function pdfToImages(pdfPath: string, maxPages = 8): Promise<string[]> {
+export async function pdfToImages(pdfPath: string, maxPages = 8): Promise<string[]> {
   const { execFile } = await import('child_process')
   const { promisify } = await import('util')
   const execFileAsync = promisify(execFile)
@@ -88,7 +88,7 @@ export async function extractPdfText(pdfPath: string): Promise<string> {
 }
 
 /** Check if extracted text is mostly readable (not garbled) */
-function isTextReadable(text: string): boolean {
+export function isTextReadable(text: string): boolean {
   const trimmed = text.replace(/\s+/g, '')
   if (trimmed.length < 50) return false
   // Count meaningful characters: CJK, Hiragana, Katakana, Latin words (2+ letters), digits
@@ -99,7 +99,6 @@ function isTextReadable(text: string): boolean {
   const latin = latinWords ? latinWords.join('').length : 0
   const meaningful = cjk + kana + latin
   const ratio = meaningful / trimmed.length
-  console.log(`[ConceptMap] Text readability: ${trimmed.length} chars, ${meaningful} meaningful (CJK:${cjk} Kana:${kana} Latin:${latin}), ratio:${ratio.toFixed(3)}`)
   return ratio > 0.4
 }
 
@@ -137,9 +136,7 @@ export async function generateConceptMap(
 
 /** Generate concept map from PDF pages as images (for scanned/image PDFs) */
 export async function generateConceptMapFromPdfImages(pdfPath: string): Promise<ConceptMapData> {
-  console.log('[ConceptMap] Using vision mode for PDF:', pdfPath)
   const images = await pdfToImages(pdfPath, 8)
-  console.log('[ConceptMap] Converted', images.length, 'pages to images')
 
   const imageMessages: OpenAI.Chat.Completions.ChatCompletionContentPart[] = images.map((b64) => ({
     type: 'image_url' as const,
@@ -163,8 +160,6 @@ export async function generateConceptMapFromPdfImages(pdfPath: string): Promise<
   })
 
   const raw = completion.choices[0]?.message?.content || ''
-  console.log('[ConceptMap] Vision response length:', raw.length)
-  console.log('[ConceptMap] Vision raw response:', raw.slice(0, 300))
   return parseConceptMapResponse(raw)
 }
 
@@ -174,12 +169,10 @@ export async function generatePdfConceptMap(pdfPath: string): Promise<ConceptMap
   try {
     const text = await extractPdfText(pdfPath)
     if (isTextReadable(text)) {
-      console.log('[ConceptMap] PDF text is readable, using text mode')
       return generateConceptMap(text, 'pdf')
     }
-    console.log('[ConceptMap] PDF text is garbled, falling back to vision')
-  } catch (e) {
-    console.log('[ConceptMap] PDF text extraction failed, falling back to vision:', e)
+  } catch {
+    // text extraction failed, fall back to vision
   }
 
   // Fall back to vision mode (PDF pages as images)

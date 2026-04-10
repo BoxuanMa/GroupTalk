@@ -9,6 +9,7 @@ const PdfViewer = dynamic(() => import('@/components/pdf-viewer').then((m) => m.
 import { useI18n } from '@/lib/i18n/I18nProvider'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { mergeAiConfig } from '@/lib/ai-config'
+import { ArrowLeft, FileText } from 'lucide-react'
 
 interface GroupInfo {
   id: string
@@ -34,7 +35,6 @@ export default function GroupChatLivePage() {
   const token = typeof window !== 'undefined' ? localStorage.getItem('teacher_token') : null
   const groupId = params.groupId as string
 
-  // Load all groups for the activity (for switcher)
   useEffect(() => {
     if (!token) return
     fetch(`/api/activities/${params.id}`, {
@@ -48,7 +48,6 @@ export default function GroupChatLivePage() {
         setCurrentGroup(cur)
         setPdfUrl(data.activity?.pdfUrl || null)
 
-        // Build member list (students + AI) matching student-side shape
         const curGroup = data.activity?.groups?.find((g: { id: string }) => g.id === groupId)
         const humanMembers: Member[] = (curGroup?.members || []).map((m: { student: { id: string; name: string } }) => ({
           id: m.student.id,
@@ -75,7 +74,6 @@ export default function GroupChatLivePage() {
     } catch {}
   }, [params.id, groupId, token])
 
-  // Connect socket once
   useEffect(() => {
     if (!token) return
     if (socketRef.current) {
@@ -98,7 +96,6 @@ export default function GroupChatLivePage() {
     }
   }, [token])
 
-  // Join room when groupId or socket changes
   useEffect(() => {
     if (!groupId || !socket) return
     const joinNow = () => socket.emit('join-group', groupId)
@@ -112,13 +109,14 @@ export default function GroupChatLivePage() {
   }
 
   return (
-    <div className="h-screen flex">
-      {/* Left: PDF viewer (same as student chat room) */}
-      <div className="w-1/2 border-r">
+    <div className="h-screen flex bg-white">
+      {/* Left: PDF viewer */}
+      <div className="w-1/2 border-r border-slate-200">
         {pdfUrl ? (
           <PdfViewer url={pdfUrl} />
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-400">
+          <div className="flex flex-col items-center justify-center h-full text-slate-400">
+            <FileText className="w-10 h-10 mb-2 opacity-50" />
             {t('student.chat.no_pdf')}
           </div>
         )}
@@ -126,21 +124,24 @@ export default function GroupChatLivePage() {
 
       {/* Right: chat panel */}
       <div className="w-1/2 flex flex-col">
-        <div className="p-3 border-b bg-white flex items-center gap-3">
-          <Link href={`/teacher/activities/${params.id}`} className="text-gray-400 hover:text-gray-600 transition">
-            ← {t('common.back')}
+        <div className="px-4 py-3 border-b border-slate-100 bg-white flex items-center gap-3">
+          <Link href={`/teacher/activities/${params.id}`} className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 transition-colors text-sm">
+            <ArrowLeft className="w-4 h-4" />
+            {t('common.back')}
           </Link>
           <div className="flex-1 min-w-0">
-            <h1 className="font-semibold flex items-center gap-2">
+            <h1 className="font-semibold text-slate-800 flex items-center gap-2">
               {t('chat_history.title_n', { n: currentGroup?.groupNumber ?? '?' })}
-              <span className={`inline-block w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-gray-300'}`} />
+              <span className={`inline-block w-2 h-2 rounded-full transition-colors ${connected ? 'bg-emerald-500' : 'bg-slate-300'}`} />
             </h1>
           </div>
           {groups.length > 1 && (
             <select
-              className="border rounded-lg px-2 py-1 text-sm"
+              className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white text-slate-700
+                focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               value={(params.groupId as string) || ''}
               onChange={(e) => switchGroup(e.target.value)}
+              aria-label="Switch group"
             >
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>

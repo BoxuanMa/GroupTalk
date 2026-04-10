@@ -11,7 +11,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const { joinCode, studentNumber, name } = await request.json()
+  let body
+  try { body = await request.json() } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const joinCode = String(body.joinCode || '').trim().slice(0, 10)
+  const studentNumber = String(body.studentNumber || '').trim().slice(0, 30)
+  const name = String(body.name || '').trim().slice(0, 50)
 
   if (!joinCode || !studentNumber || !name) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 })

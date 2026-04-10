@@ -50,7 +50,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (activity.pdfUrl) {
       try {
         pdfMap = await generatePdfConceptMap(activity.pdfUrl)
-        console.log('[ConceptMap] PDF map generated:', pdfMap.nodes.length, 'nodes,', pdfMap.edges.length, 'edges')
       } catch (pdfErr) {
         console.error('PDF concept map generation failed:', pdfErr)
       }
@@ -61,7 +60,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     for (const group of activity.groups) {
       try {
         if (pdfMap && pdfMap.nodes.length > 0) {
-          console.log(`[Route] Saving PDF map for group ${group.groupNumber}: ${pdfMap.nodes.length} nodes, ${pdfMap.edges.length} edges`)
           await prisma.conceptMap.upsert({
             where: { id: `${group.id}-pdf` },
             update: { nodes: pdfMap.nodes as unknown as Prisma.InputJsonValue, edges: pdfMap.edges as unknown as Prisma.InputJsonValue, originalNodes: pdfMap.nodes as unknown as Prisma.InputJsonValue, originalEdges: pdfMap.edges as unknown as Prisma.InputJsonValue },

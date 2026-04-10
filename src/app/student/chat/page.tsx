@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 const PdfViewer = dynamic(() => import('@/components/pdf-viewer').then((m) => m.PdfViewer), { ssr: false })
 import { ChatPanel } from '@/components/chat-panel'
 import { useI18n } from '@/lib/i18n/I18nProvider'
+import { FileText, Loader2 } from 'lucide-react'
 
 export default function StudentChatPage() {
   const router = useRouter()
@@ -25,7 +26,6 @@ export default function StudentChatPage() {
 
     setCurrentUserId(student.id)
 
-    // Avoid creating duplicate sockets on React StrictMode double-mount
     if (socketRef.current) {
       setSocket(socketRef.current)
       return
@@ -51,7 +51,6 @@ export default function StudentChatPage() {
     socketRef.current = s
     setSocket(s)
 
-    // Fetch activity info and group members via student API
     fetch('/api/student/my-group', {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -61,7 +60,6 @@ export default function StudentChatPage() {
           setActivity({ pdfUrl: data.activity.pdfUrl })
           setMembers(data.members || [])
         }
-        // Recover groupId if missing (e.g., reopened tab)
         if (data.groupId && !resolvedGroupId) {
           resolvedGroupId = data.groupId
           localStorage.setItem('groupId', data.groupId)
@@ -74,17 +72,24 @@ export default function StudentChatPage() {
       s.disconnect()
       socketRef.current = null
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
 
   return (
-    <div className="h-screen flex">
-      <div className="w-1/2 border-r">
+    <div className="h-screen flex bg-white">
+      <div className="w-1/2 border-r border-slate-200">
         {activity?.pdfUrl ? (
           <PdfViewer url={activity.pdfUrl} />
         ) : activity === null ? (
-          <div className="flex items-center justify-center h-full text-gray-400">{t('common.loading')}</div>
+          <div className="flex flex-col items-center justify-center h-full text-slate-400">
+            <Loader2 className="w-8 h-8 animate-spin mb-2" />
+            {t('common.loading')}
+          </div>
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-400">{t('student.chat.no_pdf')}</div>
+          <div className="flex flex-col items-center justify-center h-full text-slate-400">
+            <FileText className="w-10 h-10 mb-2 opacity-50" />
+            {t('student.chat.no_pdf')}
+          </div>
         )}
       </div>
       <div className="w-1/2">

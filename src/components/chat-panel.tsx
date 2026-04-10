@@ -1,9 +1,9 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Socket } from 'socket.io-client'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ChatMessage, getAvatarColor } from '@/components/chat-message'
+import { Send, Bot, GraduationCap } from 'lucide-react'
 
 interface Message {
   id: string
@@ -30,7 +30,6 @@ interface ChatPanelProps {
 export function ChatPanel({ socket, groupId, currentUserId, members: initialMembers }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [teachers, setTeachers] = useState<Map<string, string>>(new Map())
-  // Merge base members with currently-present teachers
   const members: Member[] = [
     ...initialMembers,
     ...Array.from(teachers.entries()).map(([id, name]) => ({
@@ -45,7 +44,7 @@ export function ChatPanel({ socket, groupId, currentUserId, members: initialMemb
   const [mentionIndex, setMentionIndex] = useState(0)
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map())
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isTypingRef = useRef(false)
 
@@ -64,7 +63,6 @@ export function ChatPanel({ socket, groupId, currentUserId, members: initialMemb
 
     socket.on('new-message', (msg: Message) => {
       setMessages((prev) => [...prev, msg])
-      // Clear typing for this sender
       setTypingUsers((prev) => {
         const next = new Map(prev)
         if (msg.senderId) next.delete(msg.senderId)
@@ -118,7 +116,6 @@ export function ChatPanel({ socket, groupId, currentUserId, members: initialMemb
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, typingUsers])
 
-  // Emit typing status with debounce
   const emitTyping = useCallback((typing: boolean) => {
     if (!socket) return
     if (typing === isTypingRef.current) return
@@ -130,11 +127,10 @@ export function ChatPanel({ socket, groupId, currentUserId, members: initialMemb
     m.name.toLowerCase().includes(mentionFilter.toLowerCase())
   )
 
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const val = e.target.value
     setInput(val)
 
-    // Emit typing
     if (val.trim()) {
       emitTyping(true)
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
@@ -143,7 +139,6 @@ export function ChatPanel({ socket, groupId, currentUserId, members: initialMemb
       emitTyping(false)
     }
 
-    // Check if user is typing @
     const cursorPos = e.target.selectionStart || val.length
     const textBeforeCursor = val.slice(0, cursorPos)
     const atMatch = textBeforeCursor.match(/@([^@\s]*)$/)
@@ -168,6 +163,9 @@ export function ChatPanel({ socket, groupId, currentUserId, members: initialMemb
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    // Ignore Enter during IME composition (e.g. Chinese input confirming candidate)
+    if (e.nativeEvent.isComposing) return
+
     if (showMention && filteredMembers.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -191,7 +189,11 @@ export function ChatPanel({ socket, groupId, currentUserId, members: initialMemb
     }
 
     if (e.key === 'Enter' && !showMention) {
-      handleSend()
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault()
+        handleSend()
+      }
+      // Plain Enter = newline (default textarea behavior)
     }
   }
 
@@ -207,28 +209,38 @@ export function ChatPanel({ socket, groupId, currentUserId, members: initialMemb
   const typingNames = Array.from(typingUsers.values())
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-2 border-b bg-gray-50 flex items-center gap-3">
-        <span className="text-sm text-gray-500">成员:</span>
-        {members.map((m) => (
-          <div key={`${m.type ?? 'student'}-${m.id ?? m.name}`} className="flex items-center gap-1">
-            <div className={`w-6 h-6 rounded-full ${
-              m.type === 'ai'
-                ? 'bg-purple-500'
-                : m.type === 'teacher'
-                  ? 'bg-amber-500'
-                  : getAvatarColor(m.name)
-            } flex items-center justify-center text-white text-xs font-bold`}>
-              {m.type === 'ai' ? '🤖' : m.type === 'teacher' ? '👩‍🏫' : m.name.charAt(0).toUpperCase()}
+    <div className="flex flex-col h-full bg-white">
+      {/* Members bar */}
+      <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 flex items-center gap-3 overflow-x-auto">
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider whitespace-nowrap">Members</span>
+        <div className="flex items-center gap-2.5">
+          {members.map((m) => (
+            <div key={`${m.type ?? 'student'}-${m.id ?? m.name}`} className="flex items-center gap-1.5">
+              <div className={`w-6 h-6 rounded-full ${
+                m.type === 'ai'
+                  ? 'bg-violet-500'
+                  : m.type === 'teacher'
+                    ? 'bg-orange-500'
+                    : getAvatarColor(m.name)
+              } flex items-center justify-center text-white text-[10px] font-bold shadow-sm`}>
+                {m.type === 'ai' ? <Bot className="w-3 h-3" /> : m.type === 'teacher' ? <GraduationCap className="w-3 h-3" /> : m.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-sm text-slate-700 whitespace-nowrap">{m.name}</span>
+              {m.type === 'ai' && <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[10px] font-medium">AI</span>}
+              {m.type === 'teacher' && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px] font-medium">Teacher</span>}
             </div>
-            <span className="text-sm">{m.name}</span>
-            {m.type === 'ai' && <span className="px-1 bg-purple-100 text-purple-700 rounded text-[10px]">AI</span>}
-            {m.type === 'teacher' && <span className="px-1 bg-amber-100 text-amber-700 rounded text-[10px]">Teacher</span>}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 bg-slate-50/30">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-slate-400">
+            <Send className="w-8 h-8 mb-2 opacity-50" />
+            <p className="text-sm">No messages yet</p>
+          </div>
+        )}
         {messages.map((msg) => (
           <ChatMessage
             key={msg.id}
@@ -244,19 +256,19 @@ export function ChatPanel({ socket, groupId, currentUserId, members: initialMemb
           <div className="flex items-center gap-2 mb-3">
             <div className="flex -space-x-1">
               {typingNames.map((name) => (
-                <div key={name} className={`w-6 h-6 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-[10px] font-bold border-2 border-white`}>
+                <div key={name} className={`w-6 h-6 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-[10px] font-bold border-2 border-white shadow-sm`}>
                   {name.charAt(0).toUpperCase()}
                 </div>
               ))}
             </div>
-            <div className="bg-gray-100 rounded-lg px-3 py-2 flex items-center gap-1">
-              <span className="text-sm text-gray-500">
-                {typingNames.join('、')} 正在输入
+            <div className="bg-white border border-slate-200 rounded-2xl px-3.5 py-2 flex items-center gap-2 shadow-sm">
+              <span className="text-sm text-slate-500">
+                {typingNames.join(', ')}
               </span>
               <span className="flex gap-0.5">
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </span>
             </div>
           </div>
@@ -265,32 +277,52 @@ export function ChatPanel({ socket, groupId, currentUserId, members: initialMemb
         <div ref={bottomRef} />
       </div>
 
-      <div className="relative p-3 border-t">
+      {/* Input */}
+      <div className="relative p-3 border-t border-slate-100 bg-white">
         {showMention && filteredMembers.length > 0 && (
-          <div className="absolute bottom-full left-3 mb-1 bg-white border rounded-lg shadow-lg py-1 min-w-[160px] z-10">
+          <div className="absolute bottom-full left-3 mb-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 min-w-[180px] z-10">
             {filteredMembers.map((m, i) => (
               <div
                 key={m.name}
-                className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer ${i === mentionIndex ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors ${i === mentionIndex ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
                 onMouseDown={(e) => { e.preventDefault(); insertMention(m.name) }}
               >
-                <div className={`w-5 h-5 rounded-full ${m.type === 'ai' ? 'bg-purple-500' : getAvatarColor(m.name)} flex items-center justify-center text-white text-[10px] font-bold`}>
-                  {m.type === 'ai' ? '🤖' : m.name.charAt(0).toUpperCase()}
+                <div className={`w-5 h-5 rounded-full ${m.type === 'ai' ? 'bg-violet-500' : m.type === 'teacher' ? 'bg-orange-500' : getAvatarColor(m.name)} flex items-center justify-center text-white text-[10px] font-bold`}>
+                  {m.type === 'ai' ? <Bot className="w-2.5 h-2.5" /> : m.type === 'teacher' ? <GraduationCap className="w-2.5 h-2.5" /> : m.name.charAt(0).toUpperCase()}
                 </div>
-                <span className="text-sm">{m.name}</span>
+                <span className="text-sm text-slate-700">{m.name}</span>
               </div>
             ))}
           </div>
         )}
-        <div className="flex gap-2">
-          <Input
+        <div className="flex gap-2 items-end">
+          <textarea
             ref={inputRef}
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="输入消息... 输入 @ 提及成员"
+            placeholder="Type a message... Use @ to mention (Ctrl+Enter to send)"
+            rows={1}
+            className="flex-1 px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm
+              transition-colors duration-150 resize-none
+              placeholder:text-slate-400
+              hover:border-slate-400
+              focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            style={{ maxHeight: '120px', overflowY: 'auto' }}
+            onInput={(e) => {
+              const t = e.currentTarget
+              t.style.height = 'auto'
+              t.style.height = Math.min(t.scrollHeight, 120) + 'px'
+            }}
           />
-          <Button onClick={handleSend}>发送</Button>
+          <Button
+            onClick={handleSend}
+            disabled={!input.trim()}
+            className="rounded-xl px-3 flex-shrink-0"
+            aria-label="Send message"
+          >
+            <Send className="w-4 h-4" />
+          </Button>
         </div>
       </div>
     </div>

@@ -57,9 +57,22 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
     await writeFile(filePath, Buffer.from(bytes))
 
+    // Extract PDF text for AI context
+    let pdfText: string | null = null
+    try {
+      const { extractPdfText } = await import('@/lib/concept-map-generator')
+      pdfText = await extractPdfText(`/uploads/${params.id}/${fileName}`)
+    } catch (err) {
+      console.error('[upload] PDF text extraction failed:', err)
+    }
+
     const updated = await prisma.activity.update({
       where: { id: params.id },
-      data: { pdfUrl: `/uploads/${params.id}/${fileName}`, pdfFileName: file.name },
+      data: {
+        pdfUrl: `/uploads/${params.id}/${fileName}`,
+        pdfFileName: file.name,
+        ...(pdfText && { pdfText }),
+      },
     })
 
     return NextResponse.json({ activity: updated })

@@ -29,8 +29,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     if (!activity) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ activity })
-  } catch {
-    return unauthorized()
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Unauthorized') return unauthorized()
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -65,30 +66,34 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     // When transitioning to active, notify waiting students via Socket.IO
     if (body.status === 'active') {
       const io = getIO()
-      console.log('[DEBUG] activity-started: io exists?', !!io)
       if (io) {
         const groups = await prisma.group.findMany({
           where: { activityId: params.id },
-          include: { members: { include: { student: true } } },
+          include: { members: true },
         })
-        console.log('[DEBUG] groups to notify:', groups.length)
         for (const group of groups) {
           for (const member of group.members) {
-            console.log('[DEBUG] emitting activity-started to', `waiting:${params.id}`, 'studentId:', member.studentId)
             io.to(`waiting:${params.id}`).emit('activity-started', {
               studentId: member.studentId,
               groupId: group.id,
             })
           }
         }
-      } else {
-        console.log('[DEBUG] io is undefined! Cannot notify students.')
       }
     }
 
+    // When activity ends, clean up AI silence timers
+    if (body.status === 'ended') {
+      try {
+        const { stopTimersForActivity } = await import('@/lib/ai-engine')
+        await stopTimersForActivity(params.id)
+      } catch { /* ai-engine may not be loaded */ }
+    }
+
     return NextResponse.json({ activity: updated })
-  } catch {
-    return unauthorized()
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Unauthorized') return unauthorized()
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -133,7 +138,8 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     return NextResponse.json({ ok: true })
   } catch (err) {
+    if (err instanceof Error && err.message === 'Unauthorized') return unauthorized()
     console.error('[activity DELETE] error:', err)
-    return unauthorized()
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

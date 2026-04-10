@@ -50,6 +50,7 @@ model Activity {
   status      ActivityStatus @default(draft)
   pdfUrl      String?
   pdfFileName String?
+  pdfText     String?
   aiConfig    Json           @default("{}")
   groupSize   Json           @default("{\"min\": 2, \"max\": 4}")
   createdAt   DateTime       @default(now())
