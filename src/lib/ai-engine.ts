@@ -262,12 +262,12 @@ async function _handleAiTriggerInner(groupId: string, activityId: string) {
 
       if (text && isTextReadable(text)) {
         // Good text — use it
-        pdfSummary = text.slice(0, 8000)
+        pdfSummary = text.slice(0, 60000)
         console.log(`[AI] PDF mode: text (${pdfSummary.length} chars)`)
       } else {
         // Bad text (scanned/image PDF) — fall back to vision
         console.log(`[AI] PDF text unreadable, switching to vision mode`)
-        pdfImages = await pdfToImages(group.activity.pdfUrl, 4)
+        pdfImages = await pdfToImages(group.activity.pdfUrl, 12)
         console.log(`[AI] PDF mode: vision (${pdfImages.length} pages)`)
       }
     } catch (err) {

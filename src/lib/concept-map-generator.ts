@@ -84,7 +84,7 @@ export async function extractPdfText(pdfPath: string): Promise<string> {
   const fullPath = path.join(process.cwd(), pdfPath)
   const buffer = await readFile(fullPath)
   const data = await pdfParse(buffer)
-  return data.text.slice(0, 32000)
+  return data.text.slice(0, 100000)
 }
 
 /** Check if extracted text is mostly readable (not garbled) */
